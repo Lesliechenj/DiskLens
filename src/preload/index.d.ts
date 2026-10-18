@@ -6,10 +6,15 @@ declare global {
     electron: ElectronAPI
     api: {
       selectDirectory: () => Promise<string | null>
-      startScan: (rootPath: string) => void
+      /** 发起扫描（excludeNames：排除清单，默认勾选的目录名） */
+      startScan: (rootPath: string, excludeNames?: string[]) => void
       onScanProgress: (callback: (progress: ScanProgress) => void) => void
       onScanDone: (callback: (result: ScanResult) => void) => void
       onScanError: (callback: (message: string) => void) => void
+      /** F5：在资源管理器中定位文件/目录 */
+      locateFile: (path: string) => Promise<void>
+      /** F5：移到回收站（唯一删除路径，主进程不提供直接删除） */
+      trashFile: (path: string) => Promise<void>
     }
   }
 }

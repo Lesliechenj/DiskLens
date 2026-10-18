@@ -3,21 +3,33 @@ import type { Dirent } from 'fs'
 import { basename, join } from 'path'
 import type { ScanNode, ScanProgress, ScanResult } from '../shared/types'
 
+/** 扫描选项 */
+export interface ScanOptions {
+  /** 排除清单：目录名（basename）命中即整棵跳过，防误扫（F6） */
+  excludeNames?: string[]
+}
+
 /**
  * 递归扫描目录，产出统一 JSON 树（W2 核心逻辑）。
  *
  * - 无权限/读取失败的目录：跳过并记入 skipped 列表，扫描不中断、不崩溃
+ * - 排除清单命中的目录：整棵不遍历，计入 excluded（默认勾选，防误扫）
  * - 进度回调：每个目录遍历完成时触发一次；IPC 节流由调用方（scanner 入口）控制
  * - 符号链接、套接字等特殊文件：V1 不统计，避免重复计算和死循环
  *
  * @param rootPath 要扫描的根目录
  * @param onProgress 进度回调（目录粒度）
+ * @param options 排除清单等选项
  */
 export async function scanDirectory(
   rootPath: string,
-  onProgress?: (progress: ScanProgress) => void
+  onProgress?: (progress: ScanProgress) => void,
+  options: ScanOptions = {}
 ): Promise<ScanResult> {
   const skipped: string[] = []
+  // 排除清单小写集合，O(1) 匹配
+  const excludeSet = new Set((options.excludeNames ?? []).map((n) => n.toLowerCase()))
+  let excluded = 0
   const progress: ScanProgress = { files: 0, dirs: 0, bytes: 0, currentPath: rootPath }
   const startedAt = Date.now()
 
@@ -45,6 +57,11 @@ export async function scanDirectory(
       const fullPath = join(dirPath, entry.name)
       try {
         if (entry.isDirectory()) {
+          // 排除清单命中：整棵不遍历（F6）。根目录本身不参与匹配——用户显式选了它
+          if (excludeSet.size > 0 && excludeSet.has(entry.name.toLowerCase())) {
+            excluded++
+            continue
+          }
           progress.dirs++
           const child = await walk(fullPath)
           node.children!.push(child)
@@ -77,5 +94,5 @@ export async function scanDirectory(
   }
 
   const root = await walk(rootPath)
-  return { root, skipped, durationMs: Date.now() - startedAt }
+  return { root, skipped, excluded, durationMs: Date.now() - startedAt }
 }

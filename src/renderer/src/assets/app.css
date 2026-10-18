@@ -514,3 +514,224 @@ button:disabled {
 .pie-view {
   margin-top: 4px;
 }
+
+/* ===== W5 排除清单（F6） ===== */
+
+.excludes {
+  margin-top: 12px;
+  font-size: 13px;
+}
+
+.excludes summary {
+  cursor: pointer;
+  color: var(--ev-c-text-2);
+  padding: 4px 0;
+  user-select: none;
+}
+
+.excludes summary:hover {
+  color: var(--ev-c-text-1);
+}
+
+.exclude-list {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.exclude-item {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 6px;
+}
+
+.exclude-item:hover {
+  background: var(--color-background-mute);
+}
+
+.exclude-item input {
+  accent-color: #3b6fd4;
+  cursor: pointer;
+}
+
+.exclude-name {
+  font-weight: 600;
+  color: var(--ev-c-text-1);
+  min-width: 180px;
+}
+
+.exclude-desc {
+  font-size: 12px;
+  color: var(--ev-c-text-3);
+}
+
+/* ===== W5 风险图例（F7） ===== */
+
+.risk-legend {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--ev-c-text-3);
+  white-space: nowrap;
+}
+
+/* ===== W5 文件操作面板 + 二次确认（F5） ===== */
+
+.action-panel {
+  position: relative;
+  margin-top: 12px;
+  background: var(--color-background-mute);
+  border: 1px solid #3b6fd4;
+  border-radius: 10px;
+  padding: 14px 16px;
+}
+
+.action-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.action-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--ev-c-text-1);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.action-close {
+  border: none;
+  background: transparent;
+  color: var(--ev-c-text-3);
+  padding: 2px 6px;
+  font-size: 13px;
+}
+
+.action-close:hover {
+  color: var(--ev-c-text-1);
+  background: var(--ev-c-gray-3);
+}
+
+.risk-badge {
+  flex: none;
+  font-size: 12px;
+  font-weight: 700;
+  border-radius: 6px;
+  padding: 3px 10px;
+}
+
+.risk-badge.safe {
+  color: #7fc96a;
+  background: rgba(126, 200, 106, 0.14);
+  border: 1px solid rgba(126, 200, 106, 0.4);
+}
+
+.risk-badge.caution {
+  color: #e0a458;
+  background: rgba(224, 164, 88, 0.14);
+  border: 1px solid rgba(224, 164, 88, 0.4);
+}
+
+.risk-badge.danger {
+  color: #e06c75;
+  background: rgba(224, 108, 117, 0.14);
+  border: 1px solid rgba(224, 108, 117, 0.45);
+}
+
+.action-meta {
+  margin-top: 8px;
+  font-size: 13px;
+  color: var(--ev-c-text-2);
+  line-height: 1.6;
+}
+
+.action-path {
+  font-size: 12px;
+  color: var(--ev-c-text-3);
+  word-break: break-all;
+}
+
+.action-risk-hint {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--ev-c-text-3);
+}
+
+.action-buttons {
+  display: flex;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+button.danger {
+  color: #ffb3b8;
+  background: rgba(224, 108, 117, 0.18);
+  border-color: rgba(224, 108, 117, 0.55);
+}
+
+button.danger:hover {
+  background: rgba(224, 108, 117, 0.3);
+}
+
+.action-flash {
+  margin-top: 10px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.action-flash.ok {
+  color: #7fc96a;
+}
+
+.action-flash.err {
+  color: #e06c75;
+}
+
+/* 二次确认弹窗 */
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.modal {
+  width: min(440px, calc(100vw - 48px));
+  background: var(--color-background-soft);
+  border: 1px solid var(--ev-c-gray-3);
+  border-radius: 12px;
+  padding: 20px 22px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+}
+
+.modal h3 {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--ev-c-text-1);
+  margin-bottom: 10px;
+}
+
+.modal p {
+  font-size: 13px;
+  color: var(--ev-c-text-2);
+  line-height: 1.7;
+  word-break: break-all;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 16px;
+}

@@ -2,12 +2,13 @@ import { useCallback, useMemo, useRef, useState } from 'react'
 import { useScanStore } from '../store/scanStore'
 import { formatBytes } from '../../../shared/format'
 import { SEARCH_LIMIT, searchTree } from '../lib/searchTree'
+import { RISK, riskOf } from '../lib/risk'
 import { TreemapView } from './TreemapView'
 import { PieView } from './PieView'
 
 /** 结果区工具栏：视图切换 + 类型筛选 + 搜索（F3/F4） */
 export function ResultPanel(): React.JSX.Element {
-  const { view, setView, visibleTypes, setVisibleTypes, extFilter, setExtFilter, result, jumpTo } =
+  const { view, setView, visibleTypes, setVisibleTypes, extFilter, setExtFilter, result, jumpTo, selectFile } =
     useScanStore()
   const [keyword, setKeyword] = useState('')
   const [searchOpen, setSearchOpen] = useState(false)
@@ -34,9 +35,11 @@ export function ResultPanel(): React.JSX.Element {
       const hit = hits[index]
       if (!hit) return
       jumpTo(hit.ancestors, hit.node)
+      // 同时选中，弹出文件操作面板（定位/回收站）
+      selectFile(hit.node)
       setSearchOpen(false)
     },
-    [hits, jumpTo]
+    [hits, jumpTo, selectFile]
   )
 
   // 失焦延迟关闭，给点击留时间（用 mousedown 抢在 blur 前触发）
@@ -107,7 +110,9 @@ export function ResultPanel(): React.JSX.Element {
                     {hit.node.type === 'dir' ? '目录' : '文件'}
                   </span>
                   <span className="hit-body">
-                    <span className="hit-name">{hit.node.name}</span>
+                    <span className="hit-name">
+                      {riskOf(hit.node).icon} {hit.node.name}
+                    </span>
                     <span className="hit-path">{hit.node.path}</span>
                   </span>
                   <span className="hit-size">{formatBytes(hit.node.size)}</span>
@@ -139,6 +144,10 @@ export function ResultPanel(): React.JSX.Element {
               仅 .{extFilter} 文件 ✕
             </button>
           )}
+          <span className="risk-legend">
+            风险图例：{RISK.danger.icon} {RISK.danger.label} · {RISK.caution.icon} {RISK.caution.label} ·{' '}
+            {RISK.safe.icon} {RISK.safe.label}
+          </span>
         </div>
       )}
 

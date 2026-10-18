@@ -1,6 +1,8 @@
 import type { EChartsOption } from 'echarts'
 import { formatBytes, formatTime } from '../../../shared/format'
 import type { ScanNode } from '../../../shared/types'
+import { extInfo } from '../lib/extDict'
+import { riskOf } from '../lib/risk'
 import {
   buildLevelData,
   escapeHtml,
@@ -33,7 +35,12 @@ export function buildTreemapOption(node: ScanNode, filter: LevelFilter = {}): EC
         const lines = [`<b>${escapeHtml(d.name)}</b>`, `大小：${formatBytes(d.value)}`]
         if (d.type === 'dir') lines.push('类型：目录（点击进入下一层）')
         else if (d.type === 'other') lines.push('类型：小文件合并')
-        else lines.push('类型：文件')
+        else lines.push(`类型：${extInfo(d.name).label}`)
+        // F7 风险分级："其他"合并块成分混杂，不标
+        if (d.node) {
+          const risk = riskOf(d.node)
+          lines.push(`风险：${risk.icon} ${risk.label} —— ${risk.hint}`)
+        }
         lines.push(`路径：${escapeHtml(d.path)}`)
         if (d.mtime) lines.push(`修改：${formatTime(d.mtime)}`)
         return lines.join('<br/>')
@@ -51,7 +58,12 @@ export function buildTreemapOption(node: ScanNode, filter: LevelFilter = {}): EC
           show: true,
           color: 'rgba(255, 255, 245, 0.92)',
           fontSize: 12,
-          formatter: '{b}'
+          // F7：风险图标直接标在块上（"其他"合并块不标）
+          formatter: (params) => {
+            const d = (params as { data?: ChartDatum }).data
+            if (!d) return ''
+            return d.node ? `${riskOf(d.node).icon} ${d.name}` : d.name
+          }
         },
         upperLabel: { show: false },
         emphasis: {

@@ -38,6 +38,9 @@ interface ScanState {
   focusExtension: (ext: string | null) => void
   /** 搜索命中跳转：按祖先链铺面包屑，目录则再进入一层 */
   jumpTo: (ancestors: ScanNode[], node?: ScanNode) => void
+  /** 当前选中的文件/目录（F5 操作面板对象）；null = 无选中 */
+  selectedFile: ScanNode | null
+  selectFile: (node: ScanNode | null) => void
 }
 
 export const useScanStore = create<ScanState>((set) => ({
@@ -67,5 +70,7 @@ export const useScanStore = create<ScanState>((set) => ({
       view: 'treemap',
       breadcrumb:
         node && node.type === 'dir' ? [...ancestors, node] : ancestors.length > 0 ? ancestors : s.breadcrumb
-    }))
+    })),
+  selectedFile: null,
+  selectFile: (node) => set({ selectedFile: node })
 }))

@@ -32,16 +32,20 @@ if (process.contextIsolated) {
 }
 
 // 监听主进程下发的扫描指令，执行扫描并回传进度/结果
-ipcRenderer.on('scan:run', async (_event, rootPath: string) => {
+ipcRenderer.on('scan:run', async (_event, rootPath: string, excludeNames: string[] = []) => {
   let lastSentAt = 0
   try {
-    const result = await scanDirectory(rootPath, (progress) => {
-      const now = Date.now()
-      if (now - lastSentAt >= PROGRESS_INTERVAL_MS) {
-        lastSentAt = now
-        scanBridge.sendProgress({ ...progress })
-      }
-    })
+    const result = await scanDirectory(
+      rootPath,
+      (progress) => {
+        const now = Date.now()
+        if (now - lastSentAt >= PROGRESS_INTERVAL_MS) {
+          lastSentAt = now
+          scanBridge.sendProgress({ ...progress })
+        }
+      },
+      { excludeNames }
+    )
     scanBridge.sendDone(result)
   } catch (error) {
     scanBridge.sendError(error instanceof Error ? error.message : String(error))

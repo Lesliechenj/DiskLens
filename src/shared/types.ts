@@ -36,6 +36,8 @@ export interface ScanResult {
   root: ScanNode
   /** 无权限/读取失败被跳过的目录列表（F1：跳过并记录，不弹窗不打断） */
   skipped: string[]
+  /** 被排除清单跳过、未遍历的目录数（F6：防误扫，默认勾选） */
+  excluded: number
   /** 扫描耗时（毫秒） */
   durationMs: number
 }

@@ -3,10 +3,11 @@ import ReactECharts from 'echarts-for-react'
 import { useScanStore } from '../store/scanStore'
 import { formatBytes, formatCount } from '../../../shared/format'
 import { buildTreemapOption, type ChartDatum } from './treemapData'
+import { FileActionPanel } from './FileActionPanel'
 
-/** Treemap 主视图：面包屑 + 一层数据 + 点击下钻（F2） */
+/** Treemap 主视图：面包屑 + 一层数据 + 点击下钻（F2）；点文件块弹出操作面板（F5） */
 export function TreemapView(): React.JSX.Element {
-  const { breadcrumb, pushView, popTo, visibleTypes, extFilter } = useScanStore()
+  const { breadcrumb, pushView, popTo, visibleTypes, extFilter, selectFile } = useScanStore()
   const current = breadcrumb[breadcrumb.length - 1]
 
   const filter = useMemo(
@@ -23,9 +24,13 @@ export function TreemapView(): React.JSX.Element {
       const datum = params.data as ChartDatum | undefined
       if (datum?.type === 'dir' && datum.node) {
         pushView(datum.node)
+        selectFile(null)
+      } else if (datum?.type === 'file' && datum.node) {
+        // 文件块 → 选中并弹出操作面板（定位/回收站）
+        selectFile(datum.node)
       }
     },
-    [pushView]
+    [pushView, selectFile]
   )
 
   if (!current) return <></>
@@ -62,6 +67,7 @@ export function TreemapView(): React.JSX.Element {
         onEvents={{ click: handleClick }}
         opts={{ renderer: 'canvas' }}
       />
+      <FileActionPanel />
     </div>
   )
 }

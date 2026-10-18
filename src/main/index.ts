@@ -90,9 +90,9 @@ app.whenReady().then(() => {
     return result.canceled ? null : result.filePaths[0]
   })
 
-  // IPC：渲染层发起扫描 → 转发给扫描进程
-  ipcMain.on('scan:start', (_event, rootPath: string) => {
-    scannerWindow?.webContents.send('scan:run', rootPath)
+  // IPC：渲染层发起扫描 → 转发给扫描进程（带排除清单）
+  ipcMain.on('scan:start', (_event, rootPath: string, excludeNames: string[] = []) => {
+    scannerWindow?.webContents.send('scan:run', rootPath, excludeNames)
   })
 
   // IPC：扫描进程的进度/结果/失败 → 转发给渲染层
@@ -104,6 +104,15 @@ app.whenReady().then(() => {
   })
   ipcMain.on('scan:error', (_event, message: string) => {
     mainWindow?.webContents.send('scan:error', message)
+  })
+
+  // IPC：F5 文件操作。唯一删除路径 = 回收站（shell.trashItem），
+  // 不提供任何直接删除 API——删前弹二次确认由渲染层负责。
+  ipcMain.handle('file:locate', async (_event, path: string) => {
+    shell.showItemInFolder(path)
+  })
+  ipcMain.handle('file:trash', async (_event, path: string) => {
+    await shell.trashItem(path)
   })
 
   app.on('activate', function () {
