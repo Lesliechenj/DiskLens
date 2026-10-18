@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useScanStore } from './store/scanStore'
-import { formatBytes, formatCount, formatDuration, formatTime } from '../../shared/format'
-import type { ScanNode } from '../../shared/types'
+import { TreemapView } from './components/TreemapView'
+import { formatBytes, formatCount, formatDuration } from '../../shared/format'
 import './assets/app.css'
 
 function App(): React.JSX.Element {
@@ -27,16 +27,11 @@ function App(): React.JSX.Element {
     window.api.startScan(target)
   }
 
-  // Top 10 直接子项（按大小降序）——W3 Treemap 的数据视角预演
-  const topChildren: ScanNode[] = result
-    ? [...(result.root.children ?? [])].sort((a, b) => b.size - a.size).slice(0, 10)
-    : []
-
   return (
     <div className="app">
       <header className="app-header">
         <h1>DiskLens</h1>
-        <span className="badge">W2 扫描测试</span>
+        <span className="badge">W3 Treemap 测试</span>
       </header>
 
       <section className="panel">
@@ -45,7 +40,7 @@ function App(): React.JSX.Element {
             value={rootPath}
             onChange={(e) => setRootPath(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleStart()}
-            placeholder="输入目录路径（如 C:\Users\你\Downloads），或点右侧按钮选择"
+            placeholder="输入目录路径（如 C:/Users/你/Downloads），或点右侧按钮选择"
             spellCheck={false}
           />
           <button onClick={handleSelect}>选择目录</button>
@@ -67,7 +62,8 @@ function App(): React.JSX.Element {
           </div>
           <p className="progress-text">
             已扫描 <b>{formatCount(progress?.files ?? 0)}</b> 个文件 ·{' '}
-            <b>{formatCount(progress?.dirs ?? 0)}</b> 个目录 · <b>{formatBytes(progress?.bytes ?? 0)}</b>
+            <b>{formatCount(progress?.dirs ?? 0)}</b> 个目录 ·{' '}
+            <b>{formatBytes(progress?.bytes ?? 0)}</b>
           </p>
           <p className="current-path" title={progress?.currentPath}>
             当前：{progress?.currentPath ?? '准备中…'}
@@ -79,35 +75,18 @@ function App(): React.JSX.Element {
         <section className="panel">
           <h2>扫描完成</h2>
           <p className="summary">
-            总计 <b>{formatBytes(result.root.size)}</b> · 直接子项{' '}
-            <b>{formatCount(result.root.children?.length ?? 0)}</b> 个 · 耗时{' '}
+            总计 <b>{formatBytes(result.root.size)}</b> · 耗时{' '}
             <b>{formatDuration(result.durationMs)}</b>
+            {result.skipped.length > 0 && (
+              <>
+                {' · '}
+                <span className="skipped-hint">
+                  ⚠️ {result.skipped.length} 个目录无权限，已自动跳过
+                </span>
+              </>
+            )}
           </p>
-          {result.skipped.length > 0 && (
-            <p className="skipped-hint">⚠️ {result.skipped.length} 个目录无权限，已自动跳过</p>
-          )}
-          <table className="top-table">
-            <thead>
-              <tr>
-                <th>名称</th>
-                <th className="num">大小</th>
-                <th>类型</th>
-                <th>修改时间</th>
-              </tr>
-            </thead>
-            <tbody>
-              {topChildren.map((child) => (
-                <tr key={child.path}>
-                  <td className="name" title={child.path}>
-                    {child.name}
-                  </td>
-                  <td className="num">{formatBytes(child.size)}</td>
-                  <td>{child.type === 'dir' ? '目录' : '文件'}</td>
-                  <td>{formatTime(child.mtime)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <TreemapView />
           {result.skipped.length > 0 && (
             <details className="skipped-details">
               <summary>查看跳过的 {result.skipped.length} 个目录</summary>
@@ -129,7 +108,7 @@ function App(): React.JSX.Element {
         </section>
       )}
 
-      <footer className="app-footer">仅供参考，重要文件请自行备份 · W2 里程碑</footer>
+      <footer className="app-footer">仅供参考，重要文件请自行备份 · W3 里程碑</footer>
     </div>
   )
 }
