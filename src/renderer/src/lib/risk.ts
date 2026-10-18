@@ -18,33 +18,80 @@ export interface RiskInfo {
 }
 
 export const RISK: Record<RiskLevel, RiskInfo> = {
-  safe: { level: 'safe', icon: '✅', label: '安全可删', hint: '缓存或临时文件，删了会自动重新生成' },
-  caution: { level: 'caution', icon: '⚠️', label: '谨慎', hint: '这可能是你自己的东西，删了不一定找得回' },
-  danger: { level: 'danger', icon: '❌', label: '别动', hint: '系统或程序文件，删除可能导致软件/系统出问题' }
+  safe: {
+    level: 'safe',
+    icon: '✅',
+    label: '安全可删',
+    hint: '缓存或临时文件，删了会自动重新生成'
+  },
+  caution: {
+    level: 'caution',
+    icon: '⚠️',
+    label: '谨慎',
+    hint: '这可能是你自己的东西，删了不一定找得回'
+  },
+  danger: {
+    level: 'danger',
+    icon: '❌',
+    label: '别动',
+    hint: '系统或程序文件，删除可能导致软件/系统出问题'
+  }
 }
 
 /** 命中即 ❌ 的系统关键文件名（小写比较） */
 const DANGER_FILE_NAMES = new Set([
-  'pagefile.sys', 'hiberfil.sys', 'swapfile.sys', 'bootmgr', 'bootmgr.efi',
-  'ntuser.dat', 'sam', 'system', 'software', 'security', 'default',
-  'desktop.ini', 'ntldr', 'winload.exe', 'ntoskrnl.exe', 'hal.dll'
+  'pagefile.sys',
+  'hiberfil.sys',
+  'swapfile.sys',
+  'bootmgr',
+  'bootmgr.efi',
+  'ntuser.dat',
+  'sam',
+  'system',
+  'software',
+  'security',
+  'default',
+  'desktop.ini',
+  'ntldr',
+  'winload.exe',
+  'ntoskrnl.exe',
+  'hal.dll'
 ])
 
 /** 命中即 ❌ 的系统关键目录名（小写比较） */
 const DANGER_DIR_NAMES = new Set([
-  'windows', 'system32', 'syswow64', 'winsxs', 'servicing',
-  'program files', 'program files (x86)', 'programdata',
-  'system volume information', '$recycle.bin', 'perflogs', 'boot'
+  'windows',
+  'system32',
+  'syswow64',
+  'winsxs',
+  'servicing',
+  'program files',
+  'program files (x86)',
+  'programdata',
+  'system volume information',
+  '$recycle.bin',
+  'perflogs',
+  'boot'
 ])
 
 /** 路径中含这些片段（两侧带分隔符）即 ❌ */
 const DANGER_PATH_SEGMENTS = [
-  '\\windows\\', '/windows/',
-  '\\program files', '/program files',
-  '\\programdata', '/programdata',
-  '\\system32', '/system32',
-  '\\appdata\\', '/appdata/',
-  '/etc/', '/usr/', '/bin/', '/sbin/', '/boot/', '/var/lib/'
+  '\\windows\\',
+  '/windows/',
+  '\\program files',
+  '/program files',
+  '\\programdata',
+  '/programdata',
+  '\\system32',
+  '/system32',
+  '\\appdata\\',
+  '/appdata/',
+  '/etc/',
+  '/usr/',
+  '/bin/',
+  '/sbin/',
+  '/boot/',
+  '/var/lib/'
 ]
 
 /** 给一个节点定风险级。目录看名字/路径，文件看名字/后缀/所在路径 */

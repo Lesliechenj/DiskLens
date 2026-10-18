@@ -31,13 +31,11 @@ dmg:
 linux:
   target:
     - AppImage
-    - snap
     - deb
   maintainer: DiskLens Contributors
   category: Utility
 appImage:
   artifactName: ${name}-${version}.${ext}
 npmRebuild: false
-publish:
-  provider: generic
-  url: https://example.com/auto-updates
+# 发布配置不写死：CI 里 electron-builder --publish always + GH_TOKEN，
+# 仓库地址从 git remote 自动识别（push 后即正确）

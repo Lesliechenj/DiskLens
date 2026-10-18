@@ -53,7 +53,14 @@ export const useScanStore = create<ScanState>((set) => ({
     set({ status: 'done', result, progress: null, breadcrumb: [result.root], extFilter: null }),
   setError: (message) => set({ status: 'error', error: message }),
   reset: () =>
-    set({ status: 'idle', progress: null, result: null, error: null, breadcrumb: [], extFilter: null }),
+    set({
+      status: 'idle',
+      progress: null,
+      result: null,
+      error: null,
+      breadcrumb: [],
+      extFilter: null
+    }),
   breadcrumb: [],
   pushView: (node) => set((s) => ({ breadcrumb: [...s.breadcrumb, node] })),
   popTo: (index) => set((s) => ({ breadcrumb: s.breadcrumb.slice(0, index + 1) })),
@@ -69,7 +76,11 @@ export const useScanStore = create<ScanState>((set) => ({
     set((s) => ({
       view: 'treemap',
       breadcrumb:
-        node && node.type === 'dir' ? [...ancestors, node] : ancestors.length > 0 ? ancestors : s.breadcrumb
+        node && node.type === 'dir'
+          ? [...ancestors, node]
+          : ancestors.length > 0
+            ? ancestors
+            : s.breadcrumb
     })),
   selectedFile: null,
   selectFile: (node) => set({ selectedFile: node })

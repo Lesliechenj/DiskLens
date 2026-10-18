@@ -50,9 +50,7 @@ export function FileActionPanel(): React.JSX.Element | null {
   }, [selectedFile, result, selectFile, resetView, showFlash])
 
   if (!selectedFile) {
-    return flash ? (
-      <p className={`action-flash ${flash.ok ? 'ok' : 'err'}`}>{flash.text}</p>
-    ) : null
+    return flash ? <p className={`action-flash ${flash.ok ? 'ok' : 'err'}`}>{flash.text}</p> : null
   }
 
   const risk = riskOf(selectedFile)
@@ -87,8 +85,8 @@ export function FileActionPanel(): React.JSX.Element | null {
         </button>
       </div>
       <p className="action-meta">
-        {isDir ? '目录' : extInfo(selectedFile.name).label} · {formatBytes(selectedFile.size)} · 修改于{' '}
-        {formatTime(selectedFile.mtime)}
+        {isDir ? '目录' : extInfo(selectedFile.name).label} · {formatBytes(selectedFile.size)} ·
+        修改于 {formatTime(selectedFile.mtime)}
         <br />
         <span className="action-path">{selectedFile.path}</span>
       </p>

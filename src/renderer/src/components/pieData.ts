@@ -30,8 +30,15 @@ export interface TypeAggregation {
 
 /** 分类配色（深色背景，9 色轮换；"其他"灰） */
 const PIE_COLORS = [
-  '#5a8ae8', '#e0a458', '#4ec9b0', '#c678dd',
-  '#e06c75', '#56b6c2', '#d19a66', '#98c379', '#7f848e'
+  '#5a8ae8',
+  '#e0a458',
+  '#4ec9b0',
+  '#c678dd',
+  '#e06c75',
+  '#56b6c2',
+  '#d19a66',
+  '#98c379',
+  '#7f848e'
 ]
 
 /** 全盘按扩展名聚合：top (topN-1) 种 + "其他"（纯函数，可单测） */
@@ -80,7 +87,10 @@ export function buildTypeData(root: ScanNode, topN = 8): TypeAggregation {
 }
 
 /** 构造饼图 option（纯函数，可单测）。agg 由 buildTypeData 预计算；highlightExt：高亮某扩展名切片 */
-export function buildPieOption(agg: TypeAggregation, highlightExt: string | null = null): EChartsOption {
+export function buildPieOption(
+  agg: TypeAggregation,
+  highlightExt: string | null = null
+): EChartsOption {
   const seriesData = agg.data.map((d, i) => ({
     ...d,
     itemStyle: {
@@ -108,7 +118,12 @@ export function buildPieOption(agg: TypeAggregation, highlightExt: string | null
         const d = (params as { data?: PieDatum }).data
         if (!d) return ''
         const percent = agg.totalSize > 0 ? ((d.value / agg.totalSize) * 100).toFixed(1) : '0.0'
-        const lines = [`<b>${escapeHtml(d.name)} 文件</b>`, `大小：${formatBytes(d.value)}`, `占比：${percent}%`, `个数：${formatCount(d.count)}`]
+        const lines = [
+          `<b>${escapeHtml(d.name)} 文件</b>`,
+          `大小：${formatBytes(d.value)}`,
+          `占比：${percent}%`,
+          `个数：${formatCount(d.count)}`
+        ]
         if (d.ext === null) lines.push('（多种小扩展名合并，点击不限筛选）')
         else if (d.ext === '') lines.push('（无扩展名文件，点击只看这类）')
         else lines.push(`（.${escapeHtml(d.ext)}，点击只看这类）`)

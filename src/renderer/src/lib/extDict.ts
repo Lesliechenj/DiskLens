@@ -104,8 +104,19 @@ const DICT: Record<string, ExtInfo> = {
 
 /** 常见缓存目录名（无扩展名也认得出） */
 const CACHE_DIR_NAMES = new Set([
-  'temp', 'tmp', 'cache', 'caches', 'logs', 'log', 'node_modules',
-  '__pycache__', '.gradle', '.npm', '.nuget', 'packages', 'tmpfiles'
+  'temp',
+  'tmp',
+  'cache',
+  'caches',
+  'logs',
+  'log',
+  'node_modules',
+  '__pycache__',
+  '.gradle',
+  '.npm',
+  '.nuget',
+  'packages',
+  'tmpfiles'
 ])
 
 /** 查后缀信息；未知后缀 → "其他文件" */

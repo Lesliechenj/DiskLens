@@ -8,8 +8,17 @@ import { PieView } from './PieView'
 
 /** 结果区工具栏：视图切换 + 类型筛选 + 搜索（F3/F4） */
 export function ResultPanel(): React.JSX.Element {
-  const { view, setView, visibleTypes, setVisibleTypes, extFilter, setExtFilter, result, jumpTo, selectFile } =
-    useScanStore()
+  const {
+    view,
+    setView,
+    visibleTypes,
+    setVisibleTypes,
+    extFilter,
+    setExtFilter,
+    result,
+    jumpTo,
+    selectFile
+  } = useScanStore()
   const [keyword, setKeyword] = useState('')
   const [searchOpen, setSearchOpen] = useState(false)
   const blurTimer = useRef<number | undefined>(undefined)
@@ -145,8 +154,8 @@ export function ResultPanel(): React.JSX.Element {
             </button>
           )}
           <span className="risk-legend">
-            风险图例：{RISK.danger.icon} {RISK.danger.label} · {RISK.caution.icon} {RISK.caution.label} ·{' '}
-            {RISK.safe.icon} {RISK.safe.label}
+            风险图例：{RISK.danger.icon} {RISK.danger.label} · {RISK.caution.icon}{' '}
+            {RISK.caution.label} · {RISK.safe.icon} {RISK.safe.label}
           </span>
         </div>
       )}

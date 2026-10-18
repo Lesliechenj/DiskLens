@@ -31,9 +31,7 @@ function App(): React.JSX.Element {
   }
 
   const toggleExclude = (name: string): void => {
-    setExcludes((prev) =>
-      prev.includes(name) ? prev.filter((n) => n !== name) : [...prev, name]
-    )
+    setExcludes((prev) => (prev.includes(name) ? prev.filter((n) => n !== name) : [...prev, name]))
   }
 
   return (

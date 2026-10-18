@@ -1,8 +1,8 @@
 import { useCallback, useMemo } from 'react'
-import ReactECharts from 'echarts-for-react'
 import { useScanStore } from '../store/scanStore'
 import { formatCount } from '../../../shared/format'
 import { buildPieOption, buildTypeData, type PieDatum } from './pieData'
+import { EChart } from './EChart'
 
 /** 饼图概览：全盘文件类型构成，回答"哪类文件最占"（F3） */
 export function PieView(): React.JSX.Element {
@@ -11,10 +11,7 @@ export function PieView(): React.JSX.Element {
   const focusExtension = useScanStore((s) => s.focusExtension)
 
   const agg = useMemo(() => (result ? buildTypeData(result.root) : null), [result])
-  const option = useMemo(
-    () => (agg ? buildPieOption(agg, extFilter) : {}),
-    [agg, extFilter]
-  )
+  const option = useMemo(() => (agg ? buildPieOption(agg, extFilter) : {}), [agg, extFilter])
 
   // 点切片 → 切到面积图并只显示该类型；点"其他"合并块 = 取消筛选
   const handleClick = useCallback(
@@ -32,14 +29,9 @@ export function PieView(): React.JSX.Element {
     <div className="pie-view">
       <p className="level-hint">
         全盘共 <b>{formatCount(agg.totalCount)}</b> 个文件 · {agg.typeCount} 种类型 ·{' '}
-        点饼图切片可只看该类文件，点"其他"取消
+        点饼图切片可只看该类文件，点「其他」取消
       </p>
-      <ReactECharts
-        option={option}
-        style={{ height: 460, width: '100%' }}
-        onEvents={{ click: handleClick }}
-        opts={{ renderer: 'canvas' }}
-      />
+      <EChart option={option} height={460} onEvents={{ click: handleClick as never }} />
     </div>
   )
 }
