@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useScanStore } from './store/scanStore'
-import { TreemapView } from './components/TreemapView'
+import { ResultPanel } from './components/ResultPanel'
 import { formatBytes, formatCount, formatDuration } from '../../shared/format'
 import './assets/app.css'
 
@@ -31,7 +31,7 @@ function App(): React.JSX.Element {
     <div className="app">
       <header className="app-header">
         <h1>DiskLens</h1>
-        <span className="badge">W3 Treemap 测试</span>
+        <span className="badge">W4 饼图 / 筛选 / 搜索</span>
       </header>
 
       <section className="panel">
@@ -86,7 +86,7 @@ function App(): React.JSX.Element {
               </>
             )}
           </p>
-          <TreemapView />
+          <ResultPanel />
           {result.skipped.length > 0 && (
             <details className="skipped-details">
               <summary>查看跳过的 {result.skipped.length} 个目录</summary>
@@ -108,7 +108,7 @@ function App(): React.JSX.Element {
         </section>
       )}
 
-      <footer className="app-footer">仅供参考，重要文件请自行备份 · W3 里程碑</footer>
+      <footer className="app-footer">仅供参考，重要文件请自行备份 · W4 里程碑</footer>
     </div>
   )
 }
