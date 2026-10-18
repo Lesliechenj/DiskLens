@@ -1,7 +1,8 @@
-import { app, shell, BrowserWindow, ipcMain } from 'electron'
+import { app, shell, BrowserWindow, ipcMain, dialog } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
+import type { ScanProgress, ScanResult } from '../shared/types'
 
 // 关闭硬件加速：部分老旧机器/虚拟机/远程桌面环境下 GPU 进程会直接崩溃
 // 导致整个应用闪退（FATAL: GPU process isn't usable）。
@@ -14,13 +15,18 @@ if (process.env.DISKLENS_SOFTWARE_GPU) {
   app.commandLine.appendSwitch('in-process-gpu')
 }
 
+let mainWindow: BrowserWindow | null = null
+// 隐藏的扫描进程窗口：独立进程跑 fs 遍历，不卡 UI（抄 Space Radar 已验证架构）
+let scannerWindow: BrowserWindow | null = null
+
 function createWindow(): void {
   // Create the browser window.
-  const mainWindow = new BrowserWindow({
-    width: 900,
-    height: 670,
+  mainWindow = new BrowserWindow({
+    width: 960,
+    height: 720,
     show: false,
     autoHideMenuBar: true,
+    title: 'DiskLens',
     ...(process.platform === 'linux' ? { icon } : {}),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
@@ -29,7 +35,7 @@ function createWindow(): void {
   })
 
   mainWindow.on('ready-to-show', () => {
-    mainWindow.show()
+    mainWindow!.show()
   })
 
   mainWindow.webContents.setWindowOpenHandler((details) => {
@@ -46,12 +52,24 @@ function createWindow(): void {
   }
 }
 
+// 创建隐藏的扫描进程窗口（餐厅比喻里的"后厨"）
+function createScannerWindow(): void {
+  scannerWindow = new BrowserWindow({
+    show: false, // 隐藏窗口，用户不可见
+    webPreferences: {
+      preload: join(__dirname, '../preload/scanner.js'),
+      sandbox: false
+    }
+  })
+  scannerWindow.loadFile(join(__dirname, '../renderer/scanner/index.html'))
+}
+
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.
 // Some APIs can only be used after this event occurs.
 app.whenReady().then(() => {
   // Set app user model id for windows
-  electronApp.setAppUserModelId('com.electron')
+  electronApp.setAppUserModelId('com.disklens.app')
 
   // Default open or close DevTools by F12 in development
   // and ignore CommandOrControl + R in production.
@@ -60,10 +78,33 @@ app.whenReady().then(() => {
     optimizer.watchWindowShortcuts(window)
   })
 
-  // IPC test
-  ipcMain.on('ping', () => console.log('pong'))
-
   createWindow()
+  createScannerWindow()
+
+  // IPC：渲染层选目录 → 主进程弹系统目录选择对话框
+  ipcMain.handle('dialog:openDirectory', async () => {
+    const result = await dialog.showOpenDialog({
+      properties: ['openDirectory'],
+      title: '选择要扫描的目录'
+    })
+    return result.canceled ? null : result.filePaths[0]
+  })
+
+  // IPC：渲染层发起扫描 → 转发给扫描进程
+  ipcMain.on('scan:start', (_event, rootPath: string) => {
+    scannerWindow?.webContents.send('scan:run', rootPath)
+  })
+
+  // IPC：扫描进程的进度/结果/失败 → 转发给渲染层
+  ipcMain.on('scan:progress', (_event, progress: ScanProgress) => {
+    mainWindow?.webContents.send('scan:progress', progress)
+  })
+  ipcMain.on('scan:done', (_event, result: ScanResult) => {
+    mainWindow?.webContents.send('scan:done', result)
+  })
+  ipcMain.on('scan:error', (_event, message: string) => {
+    mainWindow?.webContents.send('scan:error', message)
+  })
 
   app.on('activate', function () {
     // On macOS it's common to re-create a window in the app when the
@@ -72,7 +113,7 @@ app.whenReady().then(() => {
   })
 })
 
-// Quit when all windows are closed, except on macOS. There, it's common
+// Quit when all windows are closed, except on macOS. On it's common
 // for applications and their menu bar to stay active until the user quits
 // explicitly with Cmd + Q.
 app.on('window-all-closed', () => {

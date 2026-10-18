@@ -1,19 +1,136 @@
-import Versions from './components/Versions'
+import { useEffect, useState } from 'react'
+import { useScanStore } from './store/scanStore'
+import { formatBytes, formatCount, formatDuration, formatTime } from '../../shared/format'
+import type { ScanNode } from '../../shared/types'
+import './assets/app.css'
 
 function App(): React.JSX.Element {
+  const [rootPath, setRootPath] = useState('')
+  const { status, progress, result, error, setProgress, setDone, setError, reset } = useScanStore()
+
+  // 订阅 IPC：扫描进程 → 主进程 → 这里
+  useEffect(() => {
+    window.api.onScanProgress(setProgress)
+    window.api.onScanDone(setDone)
+    window.api.onScanError(setError)
+  }, [setProgress, setDone, setError])
+
+  const handleSelect = async (): Promise<void> => {
+    const path = await window.api.selectDirectory()
+    if (path) setRootPath(path)
+  }
+
+  const handleStart = (): void => {
+    const target = rootPath.trim()
+    if (!target || status === 'scanning') return
+    useScanStore.setState({ status: 'scanning', progress: null, result: null, error: null })
+    window.api.startScan(target)
+  }
+
+  // Top 10 直接子项（按大小降序）——W3 Treemap 的数据视角预演
+  const topChildren: ScanNode[] = result
+    ? [...(result.root.children ?? [])].sort((a, b) => b.size - a.size).slice(0, 10)
+    : []
+
   return (
-    <>
-      <div className="creator">开源 · MIT · Windows / macOS / Linux</div>
-      <div className="text">DiskLens</div>
-      <div className="text" style={{ fontSize: 18, fontWeight: 600, color: 'var(--ev-c-text-2)' }}>
-        给电脑小白的磁盘空间可视化工具
-      </div>
-      <p className="tip">块越大 = 占地方越多，一眼看懂，安全清理</p>
-      <p className="tip" style={{ fontSize: 13, opacity: 0.7 }}>
-        开发中 · W1 脚手架已就位，扫描与图表施工中
-      </p>
-      <Versions></Versions>
-    </>
+    <div className="app">
+      <header className="app-header">
+        <h1>DiskLens</h1>
+        <span className="badge">W2 扫描测试</span>
+      </header>
+
+      <section className="panel">
+        <div className="path-row">
+          <input
+            value={rootPath}
+            onChange={(e) => setRootPath(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleStart()}
+            placeholder="输入目录路径（如 C:\Users\你\Downloads），或点右侧按钮选择"
+            spellCheck={false}
+          />
+          <button onClick={handleSelect}>选择目录</button>
+        </div>
+        <button
+          className="primary"
+          disabled={status === 'scanning' || !rootPath.trim()}
+          onClick={handleStart}
+        >
+          {status === 'scanning' ? '扫描中…' : '开始扫描'}
+        </button>
+      </section>
+
+      {status === 'scanning' && (
+        <section className="panel">
+          <h2>扫描中</h2>
+          <div className="progress-track">
+            <div className="progress-indeterminate" />
+          </div>
+          <p className="progress-text">
+            已扫描 <b>{formatCount(progress?.files ?? 0)}</b> 个文件 ·{' '}
+            <b>{formatCount(progress?.dirs ?? 0)}</b> 个目录 · <b>{formatBytes(progress?.bytes ?? 0)}</b>
+          </p>
+          <p className="current-path" title={progress?.currentPath}>
+            当前：{progress?.currentPath ?? '准备中…'}
+          </p>
+        </section>
+      )}
+
+      {status === 'done' && result && (
+        <section className="panel">
+          <h2>扫描完成</h2>
+          <p className="summary">
+            总计 <b>{formatBytes(result.root.size)}</b> · 直接子项{' '}
+            <b>{formatCount(result.root.children?.length ?? 0)}</b> 个 · 耗时{' '}
+            <b>{formatDuration(result.durationMs)}</b>
+          </p>
+          {result.skipped.length > 0 && (
+            <p className="skipped-hint">⚠️ {result.skipped.length} 个目录无权限，已自动跳过</p>
+          )}
+          <table className="top-table">
+            <thead>
+              <tr>
+                <th>名称</th>
+                <th className="num">大小</th>
+                <th>类型</th>
+                <th>修改时间</th>
+              </tr>
+            </thead>
+            <tbody>
+              {topChildren.map((child) => (
+                <tr key={child.path}>
+                  <td className="name" title={child.path}>
+                    {child.name}
+                  </td>
+                  <td className="num">{formatBytes(child.size)}</td>
+                  <td>{child.type === 'dir' ? '目录' : '文件'}</td>
+                  <td>{formatTime(child.mtime)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {result.skipped.length > 0 && (
+            <details className="skipped-details">
+              <summary>查看跳过的 {result.skipped.length} 个目录</summary>
+              <ul>
+                {result.skipped.map((p) => (
+                  <li key={p}>{p}</li>
+                ))}
+              </ul>
+            </details>
+          )}
+        </section>
+      )}
+
+      {status === 'error' && (
+        <section className="panel error-panel">
+          <h2>扫描失败</h2>
+          <p>{error}</p>
+          <button onClick={reset}>重试</button>
+        </section>
+      )}
+
+      <footer className="app-footer">仅供参考，重要文件请自行备份 · W2 里程碑</footer>
+    </div>
   )
 }
 
