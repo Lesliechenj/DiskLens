@@ -4,16 +4,18 @@ import { formatBytes, formatCount } from '../../../shared/format'
 import { buildTreemapOption, type ChartDatum } from './treemapData'
 import { FileActionPanel } from './FileActionPanel'
 import { EChart } from './EChart'
+import { TopList } from './TopList'
 
 /** Treemap 主视图：面包屑 + 一层数据 + 点击下钻（F2）；点文件块弹出操作面板（F5） */
 export function TreemapView(): React.JSX.Element {
-  const { breadcrumb, pushView, popTo, visibleTypes, extFilter, selectFile } = useScanStore()
+  const { breadcrumb, pushView, popTo, visibleTypes, extFilter, selectFile, selectedFile } =
+    useScanStore()
   const current = breadcrumb[breadcrumb.length - 1]
 
   const filter = useMemo(() => ({ types: visibleTypes, ext: extFilter }), [visibleTypes, extFilter])
   const option = useMemo(
-    () => (current ? buildTreemapOption(current, filter) : {}),
-    [current, filter]
+    () => (current ? buildTreemapOption(current, filter, selectedFile?.path ?? null) : {}),
+    [current, filter, selectedFile]
   )
 
   const handleClick = useCallback(
@@ -58,8 +60,10 @@ export function TreemapView(): React.JSX.Element {
         {filtered && <span className="filtered-flag"> · 已按条件过滤</span>} · 合计{' '}
         <b>{formatBytes(current.size)}</b> · 块越大占地方越多，点目录块可进入下一层
       </p>
-      <EChart option={option} height={440} onEvents={{ click: handleClick as never }} />
+      {/* 操作面板常驻图表上方：选中即出现，不用翻页找 */}
       <FileActionPanel />
+      <EChart option={option} height={440} onEvents={{ click: handleClick as never }} />
+      <TopList node={current} mode="level" title="本层最大的 10 个" />
     </div>
   )
 }

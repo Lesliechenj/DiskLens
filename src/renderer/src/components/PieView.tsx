@@ -3,6 +3,7 @@ import { useScanStore } from '../store/scanStore'
 import { formatCount } from '../../../shared/format'
 import { buildPieOption, buildTypeData, type PieDatum } from './pieData'
 import { EChart } from './EChart'
+import { TopList } from './TopList'
 
 /** 饼图概览：全盘文件类型构成，回答"哪类文件最占"（F3） */
 export function PieView(): React.JSX.Element {
@@ -32,6 +33,7 @@ export function PieView(): React.JSX.Element {
         点饼图切片可只看该类文件，点「其他」取消
       </p>
       <EChart option={option} height={460} onEvents={{ click: handleClick as never }} />
+      <TopList node={result.root} mode="tree" title="全盘最大的 10 个文件" />
     </div>
   )
 }

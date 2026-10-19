@@ -44,3 +44,28 @@ export function removeNode(root: ScanNode, targetPath: string): boolean {
   }
   return true
 }
+
+/**
+ * 全盘最大的 N 个文件（排行榜数据源）。
+ * 有界选择：只维护一个长度 limit 的有序小数组，不把所有文件排序——
+ * 百万文件的盘也就一次遍历 + 常数次插入，比全排序快一个量级。
+ */
+export function topFilesOfTree(root: ScanNode, limit = 10): ScanNode[] {
+  const top: ScanNode[] = []
+  const stack: ScanNode[] = [root]
+  while (stack.length > 0) {
+    const node = stack.pop()!
+    if (node.type === 'file') {
+      if (top.length < limit) {
+        top.push(node)
+        top.sort((a, b) => b.size - a.size)
+      } else if (node.size > top[limit - 1].size) {
+        top[limit - 1] = node
+        top.sort((a, b) => b.size - a.size)
+      }
+    } else if (node.children) {
+      for (const c of node.children) stack.push(c)
+    }
+  }
+  return top
+}

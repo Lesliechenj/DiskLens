@@ -1,8 +1,10 @@
 import { app, shell, BrowserWindow, ipcMain, dialog } from 'electron'
-import { join } from 'path'
+import { promises as fs } from 'fs'
+import { basename, join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import type { ScanProgress, ScanResult } from '../shared/types'
+import { imageMime, previewKind, TEXT_HEAD_BYTES, type PreviewKind } from '../shared/previewKinds'
 
 // 关闭硬件加速：部分老旧机器/虚拟机/远程桌面环境下 GPU 进程会直接崩溃
 // 导致整个应用闪退（FATAL: GPU process isn't usable）。
@@ -113,6 +115,35 @@ app.whenReady().then(() => {
   })
   ipcMain.handle('file:trash', async (_event, path: string) => {
     await shell.trashItem(path)
+  })
+
+  // IPC：文件预览。渲染层没有 Node 权限，读文件这件事只能在主进程干：
+  // 图片 → base64 dataURL（≤10MB）；文本 → 头部 8KB；其他/超限 → 不预览。
+  ipcMain.handle('file:preview', async (_event, path: string) => {
+    try {
+      const stat = await fs.stat(path)
+      if (!stat.isFile()) return { kind: 'none' as PreviewKind }
+      const kind = previewKind(basename(path), stat.size)
+      if (kind === 'image') {
+        const buf = await fs.readFile(path)
+        return { kind, dataUrl: `data:${imageMime(path)};base64,${buf.toString('base64')}` }
+      }
+      if (kind === 'text') {
+        const fh = await fs.open(path, 'r')
+        try {
+          const { buffer } = await fh.read(Buffer.alloc(TEXT_HEAD_BYTES), 0, TEXT_HEAD_BYTES, 0)
+          return { kind, text: buffer.toString('utf8') }
+        } finally {
+          await fh.close()
+        }
+      }
+      return { kind }
+    } catch (error) {
+      return {
+        kind: 'error' as PreviewKind,
+        message: error instanceof Error ? error.message : String(error)
+      }
+    }
   })
 
   app.on('activate', function () {

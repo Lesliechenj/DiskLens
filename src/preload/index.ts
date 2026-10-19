@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
 import type { ScanProgress, ScanResult } from '../shared/types'
+import type { PreviewResult } from '../shared/previewKinds'
 
 // Custom APIs for renderer
 const api = {
@@ -24,7 +25,9 @@ const api = {
   /** F5：在资源管理器中定位文件/目录 */
   locateFile: (path: string): Promise<void> => ipcRenderer.invoke('file:locate', path),
   /** F5：移到回收站（唯一删除路径，删前二次确认在渲染层） */
-  trashFile: (path: string): Promise<void> => ipcRenderer.invoke('file:trash', path)
+  trashFile: (path: string): Promise<void> => ipcRenderer.invoke('file:trash', path),
+  /** 文件预览：图片转 dataURL / 文本读头部（主进程读文件，渲染层无 Node 权限） */
+  previewFile: (path: string): Promise<PreviewResult> => ipcRenderer.invoke('file:preview', path)
 }
 
 // Use `contextBridge` APIs to expose Electron APIs to

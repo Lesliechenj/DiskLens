@@ -14,13 +14,23 @@ import {
 
 export { buildLevelData, type ChartDatum, type LevelFilter } from './chartCommon'
 
-/** 构造当前层的 Treemap option（纯函数，可单测） */
-export function buildTreemapOption(node: ScanNode, filter: LevelFilter = {}): EChartsOption {
+/** 构造当前层的 Treemap option（纯函数，可单测）。selectedPath：选中块的路径（白框锁住） */
+export function buildTreemapOption(
+  node: ScanNode,
+  filter: LevelFilter = {},
+  selectedPath: string | null = null
+): EChartsOption {
   const data = buildLevelData(node, filter)
   const maxSize = data.reduce((max, d) => Math.max(max, d.value), 0)
   const seriesData = data.map((d) => ({
     ...d,
-    itemStyle: { color: pickColor(d.type, sizeRatio(d, maxSize)) }
+    itemStyle: {
+      color: pickColor(d.type, sizeRatio(d, maxSize)),
+      // 选中块：持久白框（不靠 hover，小白点完也知道点的是哪块）
+      ...(selectedPath !== null && d.path === selectedPath
+        ? { borderColor: '#ffffff', borderWidth: 3 }
+        : {})
+    }
   }))
 
   return {
