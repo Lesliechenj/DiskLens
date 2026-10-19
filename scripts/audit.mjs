@@ -68,11 +68,16 @@ async function auditPage(page, label) {
     }
 
     // 重叠检测：同一行里的关键块不能互相压住
+    // （详情面板在窄窗口是"抽屉"，本来就该浮在画布上方，不算重叠）
+    const detailsIsOverlay = (() => {
+      const node = document.querySelector('.details')
+      return node ? getComputedStyle(node).position === 'absolute' : false
+    })()
     const overlaps = []
     const pairs = [
       ['.titlebar-left', '.titlebar-right'],
       ['.scanbar-row .path-field', '.scanbar-row .btn'],
-      ['.canvas', '.details'],
+      ...(detailsIsOverlay ? [] : [['.canvas', '.details']]),
       ['.view-tabs', '.filter-bar']
     ]
     for (const [a, b] of pairs) {

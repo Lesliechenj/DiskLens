@@ -5,7 +5,10 @@ import type {
   ExportPayload,
   ScanProgress,
   ScanResult,
-  TrashOutcome
+  TrashEntry,
+  TrashListing,
+  TrashOutcome,
+  TrashProgress
 } from '../shared/types'
 import type { PathCheckResult } from '../shared/paths'
 import type { PreviewResult } from '../shared/previewKinds'
@@ -23,6 +26,12 @@ export interface AppInfo {
   isDev: boolean
 }
 
+export interface RestoreOutcome {
+  id: string
+  ok: boolean
+  message?: string
+}
+
 /** 渲染层可见的 preload API（与 src/preload/index.ts 的 api 对象一一对应） */
 export interface DiskLensApi {
   selectDirectory: () => Promise<string | null>
@@ -38,6 +47,11 @@ export interface DiskLensApi {
   locateFile: (path: string) => Promise<void>
   openFile: (path: string) => Promise<void>
   trashFiles: (paths: string[]) => Promise<TrashOutcome[]>
+  onTrashProgress: (cb: (progress: TrashProgress) => void) => () => void
+  listTrash: () => Promise<TrashListing>
+  restoreTrash: (entries: TrashEntry[]) => Promise<RestoreOutcome[]>
+  emptyTrash: () => Promise<{ ok: boolean; message?: string }>
+  openTrashFolder: () => Promise<{ ok: boolean; message?: string }>
   previewFile: (path: string) => Promise<PreviewResult>
   getSettings: () => Promise<AppSettings>
   updateSettings: (patch: Partial<AppSettings>) => Promise<AppSettings>

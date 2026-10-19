@@ -71,7 +71,9 @@ export function CleanupView(): React.JSX.Element {
             return (
               <section key={group.id} className={`cleanup-card ${group.level}`}>
                 <header className="cleanup-head">
-                  <span className="cleanup-icon">{group.icon}</span>
+                  <span className="cleanup-icon">
+                    <Icon name={group.icon} size={18} />
+                  </span>
                   <div className="cleanup-title">
                     <h3>{group.title}</h3>
                     <p>{group.desc}</p>

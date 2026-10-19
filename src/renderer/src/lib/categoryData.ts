@@ -3,6 +3,7 @@
 
 import type { EChartsOption } from 'echarts'
 import { formatBytes, formatCount, formatPercent } from '../../../shared/format'
+import type { IconName } from '../../../shared/iconNames'
 import { CATEGORY_META, type ExtCategory } from '../../../shared/extCategories'
 import type { CategoryStat, Insights } from './insights'
 import { categoryColor, escapeHtml, pickTextColor, pickTooltipTheme } from './chartCommon'
@@ -12,7 +13,7 @@ const MAX_SLICES = 7
 
 export interface CategorySlice extends CategoryStat {
   label: string
-  icon: string
+  icon: IconName
 }
 
 /** 构造环形图 option（纯函数，可单测） */
@@ -31,7 +32,7 @@ export function buildCategoryDonutOption(insights: Insights, dark = true): EChar
       size: rest.reduce((s, c) => s + c.size, 0),
       count: rest.reduce((s, c) => s + c.count, 0),
       label: '其他几类',
-      icon: '📦'
+      icon: 'other'
     })
   }
 

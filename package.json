@@ -1,6 +1,6 @@
 {
   "name": "disklens",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "DiskLens —— 给电脑小白的磁盘空间可视化工具：块越大 = 占地方越多，一眼看懂，安全清理",
   "main": "./out/main/index.js",
   "author": "DiskLens Contributors",
@@ -28,6 +28,8 @@
     "@electron-toolkit/preload": "^3.0.2",
     "@electron-toolkit/utils": "^4.0.0",
     "echarts": "^6.1.0",
+    "lucide": "^1.59.0",
+    "morphicons": "^2.0.0",
     "zustand": "^5.0.15"
   },
   "devDependencies": {

@@ -127,7 +127,7 @@ export function TreemapView(): React.JSX.Element {
       <div className="view-chart-body">
         {data.length === 0 ? (
           <EmptyState
-            icon="folder-open"
+            icon="folderOpen"
             title="这一层没有能显示的内容"
             hint={
               filters.category || filters.ext || filters.minSize > 0

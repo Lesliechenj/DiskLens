@@ -70,8 +70,9 @@ export interface ScanResult {
 /** 扫描状态机 */
 export type ScanStatus = 'idle' | 'scanning' | 'done' | 'error'
 
-/** 视图类型：同一棵树的六种渲染方式 */
-export type ViewKind = 'treemap' | 'sunburst' | 'types' | 'bigfiles' | 'folders' | 'cleanup'
+/** 视图类型：同一棵树的多种渲染方式 */
+export type ViewKind =
+  'treemap' | 'sunburst' | 'types' | 'bytype' | 'bigfiles' | 'folders' | 'cleanup' | 'trash'
 
 /** 批量移到回收站的单条结果 */
 export interface TrashOutcome {
@@ -79,6 +80,55 @@ export interface TrashOutcome {
   ok: boolean
   /** 失败时的人话原因（主进程只回原始错误，翻译在渲染层） */
   message?: string
+}
+
+/** 批量移到回收站的进度（主进程逐条上报，UI 显示进度条） */
+export interface TrashProgress {
+  /** 已完成条数 */
+  done: number
+  /** 总条数 */
+  total: number
+  /** 正在处理的路径 */
+  current: string
+}
+
+/** 回收站里的一条记录（Windows $Recycle.Bin 解析结果） */
+export interface TrashEntry {
+  /** 稳定 id：分区|SID|序号 */
+  id: string
+  /** 原始文件名 */
+  name: string
+  /** 删除前的完整路径 */
+  originalPath: string
+  /** 删除时间（毫秒时间戳） */
+  deletedAt: number
+  /** 大小（字节） */
+  size: number
+  /** 回收站里的内容文件（$R…） */
+  contentPath: string
+  /** 回收站里的元数据文件（$I…） */
+  infoPath: string
+  /** 所在分区根路径，如 C:\ */
+  drive: string
+  /** 内容文件是否还在（可能已被清空） */
+  exists: boolean
+  /** 原来是不是文件夹 */
+  isFolder: boolean
+}
+
+/** 回收站整体列表 */
+export interface TrashListing {
+  entries: TrashEntry[]
+  /** 仍存在的内容合计大小 */
+  totalSize: number
+  /** 记录条数 */
+  totalCount: number
+  /** 扫描过的分区 */
+  scannedDrives: string[]
+  /** 读不了的分区/目录（无权限等） */
+  errors: string[]
+  /** 是否有分区因为权限没读到 */
+  blocked: boolean
 }
 
 /** 磁盘分区信息（首页磁盘列表） */

@@ -9,12 +9,21 @@ import type {
   ExportPayload,
   ScanProgress,
   ScanResult,
-  TrashOutcome
+  TrashEntry,
+  TrashOutcome,
+  TrashProgress
 } from '../shared/types'
 import type { PathCheckResult } from '../shared/paths'
 import { pushRecentPath } from '../shared/settings'
 import { imageMime, previewKind, TEXT_HEAD_BYTES, type PreviewKind } from '../shared/previewKinds'
 import { listDrives, enrichDrives } from './drives'
+import {
+  emptyTrash,
+  listTrash,
+  openTrashFolder,
+  restoreTrash,
+  type RestoreOutcome
+} from './recycleBin'
 import { currentSettings, flushSettings, loadSettings, updateSettings } from './settings'
 import { exportReport } from './report'
 
@@ -227,15 +236,22 @@ function sendToMain(channel: string, ...args: unknown[]): void {
   }
 }
 
-/** 批量移到回收站：逐个尝试，单个失败不打断其余（返回逐条结果） */
-async function trashMany(paths: unknown): Promise<TrashOutcome[]> {
+/** 批量移到回收站：逐个尝试，单个失败不打断其余（逐条回报进度） */
+async function trashMany(
+  paths: unknown,
+  onProgress?: (done: number, total: number, current: string) => void
+): Promise<TrashOutcome[]> {
   const list = Array.isArray(paths) ? paths : [paths]
   const outcomes: TrashOutcome[] = []
+  const total = list.length
+  let done = 0
   for (const item of list) {
     const path = typeof item === 'string' ? item.trim() : ''
     if (!path) {
       // shell.trashItem('') 不报错也不返回——直接挂死（实测卡 4 分钟），必须挡在前面
       outcomes.push({ path, ok: false, message: '文件路径是空的，这个操作没法做' })
+      done++
+      onProgress?.(done, total, path)
       continue
     }
     try {
@@ -248,6 +264,8 @@ async function trashMany(paths: unknown): Promise<TrashOutcome[]> {
         message: error instanceof Error ? error.message : String(error)
       })
     }
+    done++
+    onProgress?.(done, total, path)
   }
   return outcomes
 }
@@ -407,7 +425,49 @@ if (!gotLock) {
         const error = await shell.openPath(path)
         if (error) throw new Error(error)
       })
-      ipcMain.handle('file:trash', async (_event, paths: string[]) => trashMany(paths))
+      // 批量删除：逐条上报进度（UI 显示进度条），返回逐条结果
+      ipcMain.handle('file:trash', async (event, paths: string[]) => {
+        let lastSentAt = 0
+        return trashMany(paths, (done, total, current) => {
+          const now = Date.now()
+          // 进度节流：60ms 一条，几百个文件也不会把 IPC 打满
+          if (now - lastSentAt < 60 && done !== total) return
+          lastSentAt = now
+          if (!event.sender.isDestroyed()) {
+            const payload: TrashProgress = { done, total, current }
+            event.sender.send('trash:progress', payload)
+          }
+        })
+      })
+
+      // ---- 回收站（独立查看自己删了哪些东西） ----
+      ipcMain.handle('trash:list', async () => {
+        const drives = await listDrives()
+        const roots = drives.map((drive) => drive.path)
+        if (roots.length === 0) roots.push('C:\\')
+        return listTrash(roots)
+      })
+      ipcMain.handle(
+        'trash:restore',
+        async (_event, entries: TrashEntry[]): Promise<RestoreOutcome[]> =>
+          restoreTrash(Array.isArray(entries) ? entries : [])
+      )
+      ipcMain.handle('trash:empty', async () => {
+        try {
+          await emptyTrash()
+          return { ok: true }
+        } catch (error) {
+          return { ok: false, message: error instanceof Error ? error.message : String(error) }
+        }
+      })
+      ipcMain.handle('trash:open', async () => {
+        try {
+          await openTrashFolder()
+          return { ok: true }
+        } catch (error) {
+          return { ok: false, message: error instanceof Error ? error.message : String(error) }
+        }
+      })
 
       // ---- 文件预览 ----
       ipcMain.handle('file:preview', (_event, path: string) => {

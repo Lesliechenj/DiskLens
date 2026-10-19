@@ -113,7 +113,7 @@ export function DetailsPanel(): React.JSX.Element | null {
           title="关闭详情"
           aria-label="关闭详情"
         >
-          <Icon name="x" size={13} />
+          <Icon name="close" size={13} />
         </button>
       </header>
 
@@ -124,10 +124,11 @@ export function DetailsPanel(): React.JSX.Element | null {
 
       <div className="details-badges">
         <span className={`risk-badge ${risk.level}`} title={risk.hint}>
-          {risk.icon} {risk.label}
+          <Icon name={risk.icon} size={13} /> {risk.label}
         </span>
         <span className="tag">
-          {CATEGORY_META[category]?.icon} {CATEGORY_META[category]?.label ?? '其他'}
+          <Icon name={CATEGORY_META[category]?.icon ?? 'other'} size={13} />
+          {CATEGORY_META[category]?.label ?? '其他'}
         </span>
         {info && <span className="tag">{info.label}</span>}
       </div>
@@ -228,7 +229,7 @@ export function DetailsPanel(): React.JSX.Element | null {
         </button>
         {isDir ? (
           <button className="btn sm" onClick={enterDir}>
-            <Icon name="chevron-right" size={13} /> 进入
+            <Icon name="chevronRight" size={13} /> 进入
           </button>
         ) : (
           <button

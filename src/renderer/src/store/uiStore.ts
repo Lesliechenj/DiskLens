@@ -2,7 +2,7 @@
 // 与"数据"无关，放这里免得污染扫描/设置两个 store
 
 import { create } from 'zustand'
-import type { ScanNode } from '../../../shared/types'
+import type { ScanNode, TrashProgress } from '../../../shared/types'
 
 export type ToastKind = 'ok' | 'err' | 'info'
 
@@ -36,6 +36,9 @@ interface UiState {
   trashTargets: ScanNode[] | null
   requestTrash: (nodes: ScanNode[]) => void
   clearTrash: () => void
+  /** 批量移到回收站的实时进度（null = 没有进行中的操作） */
+  trashProgress: TrashProgress | null
+  setTrashProgress: (progress: TrashProgress | null) => void
 }
 
 let toastSeq = 0
@@ -79,7 +82,9 @@ export const useUiStore = create<UiState>((set, get) => ({
       }
       return { trashTargets: nodes }
     }),
-  clearTrash: () => set({ trashTargets: null })
+  clearTrash: () => set({ trashTargets: null }),
+  trashProgress: null,
+  setTrashProgress: (progress) => set({ trashProgress: progress })
 }))
 
 /** 便捷调用：组件里一行拿到 toast 方法 */

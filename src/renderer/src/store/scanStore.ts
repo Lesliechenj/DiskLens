@@ -12,6 +12,7 @@ import type {
   ViewKind
 } from '../../../shared/types'
 import { removeNodes } from '../lib/treeOps'
+import type { TypeQuery } from '../lib/insights'
 
 /** 当前层的筛选条件 */
 export interface Filters {
@@ -78,6 +79,10 @@ interface ScanState {
   /** 扫描栏里输入框的内容（放在 store 里：磁盘卡片/最近路径点了也能同步回显） */
   input: string
   setInput: (input: string) => void
+
+  /** "文件分类"视图当前选的类型（null = 还没选） */
+  typeQuery: TypeQuery | null
+  setTypeQuery: (query: TypeQuery | null) => void
 }
 
 export const useScanStore = create<ScanState>((set, get) => ({
@@ -177,7 +182,10 @@ export const useScanStore = create<ScanState>((set, get) => ({
   setKeyword: (keyword) => set({ keyword }),
 
   input: '',
-  setInput: (input) => set({ input })
+  setInput: (input) => set({ input }),
+
+  typeQuery: null,
+  setTypeQuery: (query) => set({ typeQuery: query })
 }))
 
 /** 当前展示层节点（面包屑最后一层；没有结果返回 null） */

@@ -30,7 +30,7 @@ export function SkippedDialog(): React.JSX.Element | null {
             <Icon name="alert" size={16} /> 被跳过的路径
           </h3>
           <button className="icon-btn xs" onClick={close} title="关闭" aria-label="关闭">
-            <Icon name="x" size={14} />
+            <Icon name="close" size={14} />
           </button>
         </header>
 

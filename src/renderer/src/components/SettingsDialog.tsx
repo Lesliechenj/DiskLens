@@ -53,7 +53,7 @@ export function SettingsDialog(): React.JSX.Element | null {
             <Icon name="settings" size={16} /> 设置
           </h3>
           <button className="icon-btn xs" onClick={close} title="关闭" aria-label="关闭设置">
-            <Icon name="x" size={14} />
+            <Icon name="close" size={14} />
           </button>
         </header>
 

@@ -122,7 +122,7 @@ export function FoldersView(): React.JSX.Element {
                     enter(dir.path)
                   }}
                 >
-                  <Icon name="chevron-right" size={13} />
+                  <Icon name="chevronRight" size={13} />
                 </button>
                 <button
                   className="icon-btn xs"

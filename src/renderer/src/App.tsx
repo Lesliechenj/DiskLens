@@ -22,9 +22,12 @@ import { ToastHost } from './components/ui/ToastHost'
 import { TreemapView } from './components/views/TreemapView'
 import { SunburstView } from './components/views/SunburstView'
 import { TypesView } from './components/views/TypesView'
+import { ByTypeView } from './components/views/ByTypeView'
 import { BigFilesView } from './components/views/BigFilesView'
 import { FoldersView } from './components/views/FoldersView'
 import { CleanupView } from './components/views/CleanupView'
+import { TrashView } from './components/views/TrashView'
+import { TrashProgressBar } from './components/TrashProgress'
 import { Icon } from './components/icons'
 import { exportReport } from './lib/exportReport'
 import { formatBytes } from '../../shared/format'
@@ -87,11 +90,16 @@ function App(): React.JSX.Element {
       useScanStore.getState().setCancelled()
       toast('info', '扫描已取消，没有保留半截结果')
     })
+    // 批量删除的逐条进度 → 底部浮动进度条
+    const offTrashProgress = window.api.onTrashProgress((progress) => {
+      useUiStore.getState().setTrashProgress(progress)
+    })
     return () => {
       offProgress()
       offDone()
       offError()
       offCancelled()
+      offTrashProgress()
     }
   }, [])
 
@@ -209,12 +217,15 @@ function App(): React.JSX.Element {
 
   const content = useMemo(() => {
     if (status === 'scanning' && !result) return <ScanningPanel />
+    if (view === 'trash') return <TrashView />
     if (!result) return <WelcomeScreen />
     switch (view) {
       case 'sunburst':
         return <SunburstView />
       case 'types':
         return <TypesView />
+      case 'bytype':
+        return <ByTypeView />
       case 'bigfiles':
         return <BigFilesView />
       case 'folders':
@@ -236,7 +247,7 @@ function App(): React.JSX.Element {
         {sidebarOpen && <Sidebar />}
         <main className="workspace">
           <ScanBar />
-          {result && <Toolbar />}
+          {(result || view === 'trash') && <Toolbar />}
           <div className="workspace-main">
             <section className="canvas">{content}</section>
             {selected && detailsOpen && <DetailsPanel />}
@@ -249,10 +260,11 @@ function App(): React.JSX.Element {
       <AboutDialog />
       <SkippedDialog />
       <TrashConfirm />
+      <TrashProgressBar />
       {dragging && (
         <div className="drop-overlay">
           <div className="drop-card">
-            <Icon name="folder-open" size={26} />
+            <Icon name="folderOpen" size={26} />
             <b>松开就开始扫描这个文件夹</b>
             <span>只会读取文件大小，不会动你的文件</span>
           </div>

@@ -4,7 +4,7 @@
 import { useSettingsStore } from '../store/settingsStore'
 import { useStartScan } from '../hooks/useStartScan'
 import { formatBytes, formatCount } from '../../../shared/format'
-import { driveTitle, driveUsageLevel, driveUsageRatio } from '../../../shared/drives'
+import { driveLetter, driveTitle, driveUsageLevel, driveUsageRatio } from '../../../shared/drives'
 import { Icon } from './icons'
 
 export function WelcomeScreen(): React.JSX.Element {
@@ -52,7 +52,7 @@ export function WelcomeScreen(): React.JSX.Element {
               title={`扫描 ${drive.path}`}
             >
               <div className="drive-card-top">
-                <span className={`drive-letter ${level}`}>{drive.label.replace(':', '')}</span>
+                <span className={`drive-letter ${level}`}>{driveLetter(drive)}</span>
                 <div className="drive-card-name">
                   <strong>{drive.volumeName || driveTitle(drive)}</strong>
                   <span>{drive.removable ? '可移动磁盘' : '本地磁盘'}</span>
@@ -75,7 +75,7 @@ export function WelcomeScreen(): React.JSX.Element {
                 </span>
               </div>
               <span className="drive-card-cta">
-                扫描这个盘 <Icon name="chevron-right" size={13} />
+                扫描这个盘 <Icon name="chevronRight" size={13} />
               </span>
             </button>
           )
@@ -84,7 +84,7 @@ export function WelcomeScreen(): React.JSX.Element {
         <button className="drive-card ghost" onClick={() => void pickFolder()}>
           <div className="drive-card-top">
             <span className="drive-letter neutral">
-              <Icon name="folder-open" size={16} />
+              <Icon name="folderOpen" size={16} />
             </span>
             <div className="drive-card-name">
               <strong>只扫一个文件夹</strong>
@@ -95,7 +95,7 @@ export function WelcomeScreen(): React.JSX.Element {
             <Icon name="folder" size={26} />
           </div>
           <span className="drive-card-cta">
-            选择文件夹 <Icon name="chevron-right" size={13} />
+            选择文件夹 <Icon name="chevronRight" size={13} />
           </span>
         </button>
       </div>

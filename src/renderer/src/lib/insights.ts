@@ -176,3 +176,47 @@ export function countChildren(node: ScanNode, limit = 200_000): { files: number;
   }
   return { files, dirs }
 }
+
+/** 按类型找文件的条件：某个后缀，或某个大类 */
+export type TypeQuery = { kind: 'ext'; value: string } | { kind: 'category'; value: ExtCategory }
+
+/** 按类型找文件的结果 */
+export interface TypeFileResult {
+  /** 命中的文件（按大小降序，最多 limit 个） */
+  files: ScanNode[]
+  /** 命中总大小（不受 limit 截断） */
+  totalSize: number
+  /** 命中总数（不受 limit 截断） */
+  totalCount: number
+  /** 是否有文件因为上限没列出来 */
+  truncated: boolean
+}
+
+/**
+ * 全树按类型收集文件：回答"我这台电脑上所有 docx / 所有视频 都在哪、占多少"。
+ * 一次遍历；只保留最大的 limit 个（有界插入），所以百万文件也不会把内存吃满。
+ */
+export function collectFilesByType(root: ScanNode, query: TypeQuery, limit = 2000): TypeFileResult {
+  const matches = (node: ScanNode): boolean => {
+    if (query.kind === 'ext') return extOf(node.name) === query.value
+    return extInfo(node.name).category === query.value
+  }
+
+  const files: ScanNode[] = []
+  let totalSize = 0
+  let totalCount = 0
+  const stack: ScanNode[] = [root]
+  while (stack.length > 0) {
+    const node = stack.pop()!
+    if (node.type === 'file') {
+      if (matches(node)) {
+        totalCount++
+        totalSize += node.size
+        insertTop(files, node, limit, (n) => n.size)
+      }
+    } else {
+      for (const kid of node.children ?? []) stack.push(kid)
+    }
+  }
+  return { files, totalSize, totalCount, truncated: totalCount > files.length }
+}

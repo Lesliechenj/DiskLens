@@ -21,11 +21,18 @@ interface ViewTab {
 
 const VIEW_TABS: ViewTab[] = [
   { key: 'treemap', label: '面积图', icon: 'grid', hint: '块越大占地方越多，点目录块下钻' },
-  { key: 'sunburst', label: '旭日图', icon: 'sunburst', hint: '两层结构一眼看穿，点目录块下钻' },
+  { key: 'sunburst', label: '旭日图', icon: 'radar', hint: '两层结构一眼看穿，点目录块下钻' },
   { key: 'types', label: '类型构成', icon: 'pie', hint: '哪类文件最占地方' },
+  {
+    key: 'bytype',
+    label: '文件分类',
+    icon: 'tags',
+    hint: '按类型列出所有文件：所有 .docx / 所有视频……'
+  },
   { key: 'bigfiles', label: '大文件', icon: 'list', hint: '全盘最大的文件排行' },
   { key: 'folders', label: '文件夹', icon: 'tree', hint: '最占地方的目录排行' },
-  { key: 'cleanup', label: '清理建议', icon: 'broom', hint: '哪些能安全删、能腾多少' }
+  { key: 'cleanup', label: '清理建议', icon: 'broom', hint: '哪些能安全删、能腾多少' },
+  { key: 'trash', label: '回收站', icon: 'recycle', hint: '看看自己删了什么，能还原' }
 ]
 
 /** 最小显示大小选项（只影响图表，不影响统计） */
@@ -115,7 +122,7 @@ export function Toolbar(): React.JSX.Element {
               <span key={node.path} className="crumb-wrap">
                 {index > 0 && (
                   <span className="crumb-sep">
-                    <Icon name="chevron-right" size={11} />
+                    <Icon name="chevronRight" size={11} />
                   </span>
                 )}
                 <button
@@ -146,7 +153,7 @@ export function Toolbar(): React.JSX.Element {
                 popTo(crumbs.length - 2)
               }}
             >
-              <Icon name="arrow-up" size={12} /> 上一层
+              <Icon name="arrowUp" size={12} /> 上一层
             </button>
           )}
         </nav>
@@ -195,7 +202,7 @@ export function Toolbar(): React.JSX.Element {
                   inputRef.current?.focus()
                 }}
               >
-                <Icon name="x" size={12} />
+                <Icon name="close" size={12} />
               </button>
             )}
 
@@ -225,7 +232,9 @@ export function Toolbar(): React.JSX.Element {
                     <Icon name={hit.node.type === 'dir' ? 'folder' : 'file'} size={13} />
                     <span className="hit-body">
                       <span className="hit-name">
-                        {riskOf(hit.node).level !== 'caution' && `${riskOf(hit.node).icon} `}
+                        {riskOf(hit.node).level !== 'caution' && (
+                          <Icon name={riskOf(hit.node).icon} size={11} className="hit-risk" />
+                        )}
                         {hit.node.name}
                       </span>
                       <span className="hit-path">{hit.node.path}</span>
@@ -298,12 +307,15 @@ export function Toolbar(): React.JSX.Element {
                 onClick={() => setCategory(null)}
                 title="取消类型筛选"
               >
-                {CATEGORY_META[filters.category].icon} {CATEGORY_META[filters.category].label} ✕
+                <Icon name={CATEGORY_META[filters.category].icon} size={12} />
+                {CATEGORY_META[filters.category].label}
+                <Icon name="close" size={11} />
               </button>
             )}
             {filters.ext !== null && (
               <button className="chip accent" onClick={() => setExt(null)} title="取消后缀筛选">
-                .{filters.ext || '无后缀'} ✕
+                .{filters.ext || '无后缀'}
+                <Icon name="close" size={11} />
               </button>
             )}
             {hasFilter && (

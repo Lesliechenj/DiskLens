@@ -90,7 +90,7 @@ export function SunburstView(): React.JSX.Element {
       <div className="view-chart-body">
         {childCount === 0 ? (
           <EmptyState
-            icon="folder-open"
+            icon="folderOpen"
             title="这一层没有子项"
             hint="回去上一层，或者换个目录看看。"
           />

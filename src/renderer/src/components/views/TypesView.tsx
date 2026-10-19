@@ -19,30 +19,26 @@ const EXT_PAGE = 30
 export function TypesView(): React.JSX.Element {
   const insights = useInsights()
   const dark = useDark()
-  const setCategory = useScanStore((state) => state.setCategory)
-  const setExt = useScanStore((state) => state.setExt)
   const setView = useScanStore((state) => state.setView)
-  const resetView = useScanStore((state) => state.resetView)
+  const setTypeQuery = useScanStore((state) => state.setTypeQuery)
   const filters = useScanStore((state) => state.filters)
   const [showAllExts, setShowAllExts] = useState(false)
 
-  // 类型统计是全盘的：所以点任意一行都先回到根层，再去面积图里看这一类
+  // 点一行 = 去"文件分类"视图把这一类文件全列出来（比只筛个图更实用）
   const focusCategory = useCallback(
-    (category: ExtCategory | null): void => {
-      resetView()
-      setCategory(category, null)
-      setView('treemap')
+    (category: ExtCategory): void => {
+      setTypeQuery({ kind: 'category', value: category })
+      setView('bytype')
     },
-    [resetView, setCategory, setView]
+    [setTypeQuery, setView]
   )
 
   const focusExt = useCallback(
-    (ext: string | null): void => {
-      resetView()
-      setExt(ext)
-      setView('treemap')
+    (ext: string): void => {
+      setTypeQuery({ kind: 'ext', value: ext })
+      setView('bytype')
     },
-    [resetView, setExt, setView]
+    [setTypeQuery, setView]
   )
 
   const option = useMemo(
@@ -96,7 +92,7 @@ export function TypesView(): React.JSX.Element {
         <section className="card">
           <header className="card-head">
             <h3>哪类最占地方</h3>
-            <span className="card-sub">点一行 = 只看这类</span>
+            <span className="card-sub">点一行 = 列出这类文件</span>
           </header>
           <div className="cat-rows">
             {rows.map((row) => {
@@ -105,12 +101,12 @@ export function TypesView(): React.JSX.Element {
                 <button
                   key={row.category}
                   className={`cat-row${active ? ' active' : ''}`}
-                  onClick={() => focusCategory(active ? null : row.category)}
-                  title={`只看「${row.label}」（回到根层看这一类）`}
+                  onClick={() => focusCategory(row.category)}
+                  title={`列出所有「${row.label}」文件`}
                 >
                   <span className="cat-dot" style={{ background: categoryColor(row.category) }} />
                   <span className="cat-name">
-                    {row.icon} {row.label}
+                    <Icon name={row.icon} size={13} /> {row.label}
                   </span>
                   <span className="cat-bar">
                     <i
@@ -134,7 +130,7 @@ export function TypesView(): React.JSX.Element {
       <section className="card">
         <header className="card-head">
           <h3>按后缀明细</h3>
-          <span className="card-sub">全盘 · 点一行 = 只看这类文件</span>
+          <span className="card-sub">全盘 · 点一行 = 列出这类文件</span>
         </header>
         <div className="ext-table">
           <div className="ext-head">
@@ -148,8 +144,8 @@ export function TypesView(): React.JSX.Element {
             <button
               key={ext.ext || '(none)'}
               className={`ext-row${filters.ext === ext.ext ? ' active' : ''}`}
-              onClick={() => focusExt(filters.ext === ext.ext ? null : ext.ext)}
-              title={`只看 .${ext.ext || '（无后缀）'} 文件`}
+              onClick={() => focusExt(ext.ext)}
+              title={`列出所有 .${ext.ext || '（无后缀）'} 文件`}
             >
               <span className="ext-name">
                 <i className="cat-dot" style={{ background: categoryColor(ext.category) }} />
@@ -169,7 +165,7 @@ export function TypesView(): React.JSX.Element {
             onClick={() => setShowAllExts((value) => !value)}
           >
             {showAllExts ? '收起' : `展开全部 ${exts.length} 种后缀`}
-            <Icon name={showAllExts ? 'chevron-down' : 'chevron-right'} size={13} />
+            <Icon name={showAllExts ? 'chevronDown' : 'chevronRight'} size={13} />
           </button>
         )}
       </section>

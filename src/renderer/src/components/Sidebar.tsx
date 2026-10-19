@@ -4,10 +4,11 @@
 import { Icon } from './icons'
 import { useSettingsStore } from '../store/settingsStore'
 import { useScanStore } from '../store/scanStore'
+import { useTrashStore } from '../store/trashStore'
 import { useUiStore, toast } from '../store/uiStore'
 import { useStartScan } from '../hooks/useStartScan'
 import { useCleanupGroups, useCleanupTotal } from '../hooks/useDerived'
-import { driveTitle, driveUsageLevel, driveUsageRatio } from '../../../shared/drives'
+import { driveLetter, driveTitle, driveUsageLevel, driveUsageRatio } from '../../../shared/drives'
 import { formatBytes, formatCount, formatRelativeTime } from '../../../shared/format'
 import { baseNameOf } from '../../../shared/paths'
 import { exportReport } from '../lib/exportReport'
@@ -64,7 +65,7 @@ export function Sidebar(): React.JSX.Element {
                   onClick={() => void startScan(drive.path)}
                   title={`扫描 ${drive.path}（共 ${formatBytes(drive.totalBytes)}，可用 ${formatBytes(drive.freeBytes)}）`}
                 >
-                  <span className={`drive-badge ${level}`}>{drive.label.replace(':', '')}</span>
+                  <span className={`drive-badge ${level}`}>{driveLetter(drive)}</span>
                   <span className="drive-body">
                     <span className="drive-name">
                       {name}
@@ -138,6 +139,17 @@ export function Sidebar(): React.JSX.Element {
           >
             <Icon name="export" size={15} />
             <span className="side-action-text">导出报告</span>
+          </button>
+          <button
+            className={`side-action ${view === 'trash' ? 'active' : ''}`}
+            onClick={() => {
+              setView('trash')
+              useTrashStore.getState().refresh()
+            }}
+            title="看看自己删了什么，能还原或清空"
+          >
+            <Icon name="recycle" size={15} />
+            <span className="side-action-text">回收站</span>
           </button>
           <button className="side-action" onClick={openSettings}>
             <Icon name="settings" size={15} />

@@ -2,6 +2,8 @@
 // .pdf → "PDF 文档"、.mp4 → "视频文件"……未知后缀回落"其他文件"
 // 放在 shared 是因为主进程（导出报告）和渲染层（图表配色/风险分级）都要用同一份口径
 
+import type { IconName } from './iconNames'
+
 /** 文件大类（用于图表配色、统计、风险判定的中间层） */
 export type ExtCategory =
   | 'video' // 视频
@@ -15,26 +17,27 @@ export type ExtCategory =
   | 'cache' // 缓存/临时
   | 'other' // 其他
 
-/** 大类展示信息：图例、颜色（深色背景与浅色背景都够对比度） */
+/** 大类展示信息：图标、颜色（深色背景与浅色背景都够对比度） */
 export interface CategoryMeta {
   label: string
-  icon: string
+  /** 图标语义名（渲染层 components/icons.tsx 负责画出来） */
+  icon: IconName
   color: string
   /** 一句话解释，给小白 */
   hint: string
 }
 
 export const CATEGORY_META: Record<ExtCategory, CategoryMeta> = {
-  video: { label: '视频', icon: '🎬', color: '#8b7bf7', hint: '电影、录屏、短视频' },
-  image: { label: '图片', icon: '🖼️', color: '#38bdf8', hint: '照片、截图、设计图' },
-  audio: { label: '音频', icon: '🎵', color: '#f472b6', hint: '音乐、录音、播客' },
-  doc: { label: '文档', icon: '📄', color: '#34d399', hint: '办公文档、笔记、电子书' },
-  archive: { label: '压缩包', icon: '🗜️', color: '#fbbf24', hint: 'zip / rar 等打包文件' },
-  program: { label: '程序', icon: '⚙️', color: '#f87171', hint: '安装包、可执行程序' },
-  code: { label: '代码', icon: '🧩', color: '#60a5fa', hint: '源码、配置、数据文件' },
-  system: { label: '系统', icon: '🛡️', color: '#94a3b8', hint: '系统组件与配置文件' },
-  cache: { label: '缓存', icon: '♻️', color: '#a3e635', hint: '临时文件、日志，删了会重新生成' },
-  other: { label: '其他', icon: '📦', color: '#64748b', hint: '没见过的后缀' }
+  video: { label: '视频', icon: 'film', color: '#8b7bf7', hint: '电影、录屏、短视频' },
+  image: { label: '图片', icon: 'image', color: '#38bdf8', hint: '照片、截图、设计图' },
+  audio: { label: '音频', icon: 'audio', color: '#f472b6', hint: '音乐、录音、播客' },
+  doc: { label: '文档', icon: 'doc', color: '#34d399', hint: '办公文档、笔记、电子书' },
+  archive: { label: '压缩包', icon: 'archive', color: '#fbbf24', hint: 'zip / rar 等打包文件' },
+  program: { label: '程序', icon: 'program', color: '#f87171', hint: '安装包、可执行程序' },
+  code: { label: '代码', icon: 'code', color: '#60a5fa', hint: '源码、配置、数据文件' },
+  system: { label: '系统', icon: 'system', color: '#94a3b8', hint: '系统组件与配置文件' },
+  cache: { label: '缓存', icon: 'cache', color: '#a3e635', hint: '临时文件、日志，删了会重新生成' },
+  other: { label: '其他', icon: 'other', color: '#64748b', hint: '没见过的后缀' }
 }
 
 export interface ExtInfo {

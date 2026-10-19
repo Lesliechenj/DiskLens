@@ -6,10 +6,20 @@ import type {
   ExportPayload,
   ScanProgress,
   ScanResult,
-  TrashOutcome
+  TrashEntry,
+  TrashListing,
+  TrashOutcome,
+  TrashProgress
 } from '../shared/types'
 import type { PathCheckResult } from '../shared/paths'
 import type { PreviewResult } from '../shared/previewKinds'
+
+/** 还原回收站条目的逐条结果 */
+export interface RestoreOutcome {
+  id: string
+  ok: boolean
+  message?: string
+}
 
 /** 扫描启动结果：失败的常见原因是"已经有一次扫描在跑" */
 export interface ScanStartResult {
@@ -80,6 +90,19 @@ const api = {
   /** 右键菜单：返回用户选的动作（open/locate/copy/copy-name/filter/enter/trash），取消返回 null */
   showNodeMenu: (path: string, type: 'file' | 'dir' | 'other'): Promise<string | null> =>
     ipcRenderer.invoke('menu:node', path, type),
+  /** 批量移到回收站的逐条进度 */
+  onTrashProgress: (cb: (progress: TrashProgress) => void): (() => void) =>
+    subscribe('trash:progress', cb),
+  /** 列出系统回收站内容（自己删了哪些东西） */
+  listTrash: (): Promise<TrashListing> => ipcRenderer.invoke('trash:list'),
+  /** 还原回收站里的条目（原位置有同名文件就不覆盖） */
+  restoreTrash: (entries: TrashEntry[]): Promise<RestoreOutcome[]> =>
+    ipcRenderer.invoke('trash:restore', entries),
+  /** 清空系统回收站（不可恢复） */
+  emptyTrash: (): Promise<{ ok: boolean; message?: string }> => ipcRenderer.invoke('trash:empty'),
+  /** 打开资源管理器里的回收站 */
+  openTrashFolder: (): Promise<{ ok: boolean; message?: string }> =>
+    ipcRenderer.invoke('trash:open'),
   /** 应用版本信息 */
   appInfo: (): Promise<AppInfo> => ipcRenderer.invoke('app:info'),
   /** 拖拽进来的文件/文件夹 → 真实磁盘路径（Electron 32+ 必须走 webUtils） */

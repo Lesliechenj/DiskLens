@@ -1,7 +1,7 @@
 // 自定义标题栏：品牌 + 窗口拖拽区 + 主题/设置开关
 // Windows 上右侧留给系统窗口按钮（titleBarOverlay），用 padding 避让
 
-import { Icon } from './icons'
+import { Icon, MorphingIcon } from './icons'
 import { useSettingsStore } from '../store/settingsStore'
 import { useScanStore } from '../store/scanStore'
 import { useUiStore } from '../store/uiStore'
@@ -28,7 +28,7 @@ export function TitleBar(): React.JSX.Element {
           title={sidebarOpen ? '收起侧栏' : '展开侧栏'}
           aria-label="切换侧栏"
         >
-          <Icon name={sidebarOpen ? 'chevron-left' : 'chevron-right'} size={16} />
+          <MorphingIcon name={sidebarOpen ? 'chevronLeft' : 'chevronRight'} size={16} />
         </button>
         <div className="brand">
           <span className="brand-mark" aria-hidden="true">
@@ -64,7 +64,7 @@ export function TitleBar(): React.JSX.Element {
           title={dark ? '切换到浅色主题' : '切换到深色主题'}
           aria-label="切换主题"
         >
-          <Icon name={dark ? 'sun' : 'moon'} size={16} />
+          <MorphingIcon name={dark ? 'sun' : 'moon'} size={16} />
         </button>
         <button className="icon-btn" onClick={openSettings} title="设置" aria-label="设置">
           <Icon name="settings" size={16} />

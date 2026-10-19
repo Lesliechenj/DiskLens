@@ -81,7 +81,7 @@ export function buildTreemapOption(
         }
         if (d.node) {
           const risk = riskOf(d.node)
-          lines.push(`风险：${risk.icon} ${risk.label} —— ${risk.hint}`)
+          lines.push(`风险：${risk.label} —— ${risk.hint}`)
         }
         lines.push(`路径：${escapeHtml(d.path)}`)
         if (d.mtime) lines.push(`修改：${formatTime(d.mtime)}（${formatRelativeTime(d.mtime)}）`)
@@ -101,13 +101,10 @@ export function buildTreemapOption(
           show: true,
           color: textColor,
           fontSize: 12,
-          // 风险图标直接标在块上（"其他"合并块不标）
+          // 标签只写名字：风险已经在详情面板/列表里用图标表达，画布上保持干净
           formatter: (params) => {
             const d = (params as { data?: ChartDatum }).data
-            if (!d) return ''
-            const risk = d.node ? riskOf(d.node) : null
-            const icon = risk && risk.level !== 'caution' ? `${risk.icon} ` : ''
-            return `${icon}${d.name}`
+            return d ? d.name : ''
           }
         },
         upperLabel: { show: false },

@@ -3,6 +3,7 @@
 // 规则全部来自 shared/risk 与后缀词典，口径与图表上的风险标签一致
 
 import type { ScanNode } from '../../../shared/types'
+import type { IconName } from '../../../shared/iconNames'
 import { extOf, extInfo, isCacheDirName } from '../../../shared/extCategories'
 import { riskOf } from '../../../shared/risk'
 
@@ -13,7 +14,7 @@ export interface CleanupGroup {
   title: string
   /** 一句话解释，说清"删了会怎样" */
   desc: string
-  icon: string
+  icon: IconName
   /** 组内最大风险等级（渲染用色） */
   level: 'safe' | 'caution'
   /** 命中节点（按大小降序；存的是引用，不额外占内存） */
@@ -43,7 +44,7 @@ interface Rule {
   id: string
   title: string
   desc: string
-  icon: string
+  icon: IconName
   level: 'safe' | 'caution' | 'danger'
   /** 判断一个节点是否命中（文件与目录分别判断前先看类型） */
   match: (node: ScanNode, lowerPath: string) => boolean
@@ -54,7 +55,7 @@ const RULES: Rule[] = [
     id: 'temp',
     title: '临时文件',
     desc: '软件运行时留下的半成品，删了会自动重新生成，不影响使用',
-    icon: '🧹',
+    icon: 'broom',
     level: 'safe',
     match: (node, lowerPath) =>
       node.type === 'file' &&
@@ -64,7 +65,7 @@ const RULES: Rule[] = [
     id: 'logs',
     title: '日志与崩溃转储',
     desc: '软件记录运行过程用的，平时没人看，删了只会少些排查线索',
-    icon: '🗒️',
+    icon: 'scrollText',
     level: 'safe',
     match: (node, lowerPath) =>
       node.type === 'file' && (LOG_EXTS.has(extOf(node.name)) || /\/logs?\//.test(lowerPath))
@@ -73,7 +74,7 @@ const RULES: Rule[] = [
     id: 'cache-dirs',
     title: '缓存目录',
     desc: '浏览器/软件攒下的缓存，删了最多重新下载一次',
-    icon: '♻️',
+    icon: 'cache',
     level: 'safe',
     match: (node) => node.type === 'dir' && isCacheDirName(node.name)
   },
@@ -81,7 +82,7 @@ const RULES: Rule[] = [
     id: 'cache-files',
     title: '缓存文件',
     desc: '各种 .cache 文件，属于"再生资源"',
-    icon: '💾',
+    icon: 'database',
     level: 'safe',
     match: (node) => node.type === 'file' && extInfo(node.name).category === 'cache'
   },
@@ -89,7 +90,7 @@ const RULES: Rule[] = [
     id: 'recycle',
     title: '回收站占用',
     desc: '你删过但还在回收站里占地方的文件，清空回收站才能真正腾出空间',
-    icon: '🗑️',
+    icon: 'recycle',
     level: 'caution',
     match: (node) => /\$recycle\.bin|\/\.trash/i.test(node.path)
   },
@@ -97,7 +98,7 @@ const RULES: Rule[] = [
     id: 'old-system',
     title: '旧系统备份',
     desc: '系统升级留下的 Windows.old，确认新系统没问题后可以删',
-    icon: '🪟',
+    icon: 'monitor',
     level: 'caution',
     match: (node) => node.name.toLowerCase() === 'windows.old'
   },
@@ -105,7 +106,7 @@ const RULES: Rule[] = [
     id: 'installers',
     title: '下载的安装包',
     desc: '装完就不用的 exe/msi 安装包，留着占地方',
-    icon: '📦',
+    icon: 'package',
     level: 'caution',
     match: (node, lowerPath) =>
       node.type === 'file' &&
@@ -116,7 +117,7 @@ const RULES: Rule[] = [
     id: 'archives',
     title: '未解压的压缩包',
     desc: '解压完的 zip/rar 原件，内容还在的话可以清掉',
-    icon: '🗜️',
+    icon: 'archive',
     level: 'caution',
     match: (node) =>
       node.type === 'file' && ['zip', 'rar', '7z', 'tar', 'gz'].includes(extOf(node.name))

@@ -25,7 +25,7 @@ export function AboutDialog(): React.JSX.Element | null {
             <Icon name="info" size={16} /> 关于 DiskLens
           </h3>
           <button className="icon-btn xs" onClick={close} title="关闭" aria-label="关闭关于">
-            <Icon name="x" size={14} />
+            <Icon name="close" size={14} />
           </button>
         </header>
 

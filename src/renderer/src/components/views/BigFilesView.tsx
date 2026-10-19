@@ -72,7 +72,7 @@ export function BigFilesView(): React.JSX.Element {
 
   const sortMark = (key: SortKey): React.JSX.Element | null =>
     sortKey === key ? (
-      <Icon name={asc ? 'arrow-up' : 'chevron-down'} size={11} className="sort-mark" />
+      <Icon name={asc ? 'arrowUp' : 'chevronDown'} size={11} className="sort-mark" />
     ) : null
 
   return (
@@ -135,7 +135,7 @@ export function BigFilesView(): React.JSX.Element {
                 <span className="tag tiny">{info.label}</span>
                 {risk.level !== 'caution' && (
                   <span className={`tag tiny risk-${risk.level}`} title={risk.hint}>
-                    {risk.icon} {risk.label}
+                    <Icon name={risk.icon} size={11} /> {risk.label}
                   </span>
                 )}
               </span>

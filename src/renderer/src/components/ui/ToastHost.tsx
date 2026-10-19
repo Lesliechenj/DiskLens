@@ -19,7 +19,7 @@ export function ToastHost(): React.JSX.Element {
           </span>
           <span className="toast-text">{toast.text}</span>
           <button className="toast-close" onClick={() => dismiss(toast.id)} title="关闭">
-            <Icon name="x" size={13} />
+            <Icon name="close" size={13} />
           </button>
         </div>
       ))}

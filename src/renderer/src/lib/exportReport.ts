@@ -54,7 +54,7 @@ export async function exportReport(): Promise<string | null> {
         formatBytes(file.size),
         formatPercent(file.size, insights.totalSize),
         formatTime(file.mtime),
-        `${risk.icon} ${risk.label}`,
+        risk.label,
         extInfo(file.name).label,
         file.path
       ])

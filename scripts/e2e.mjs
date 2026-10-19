@@ -95,7 +95,10 @@ async function main() {
   page.on('console', (message) => {
     if (message.type() === 'error') consoleErrors.push(message.text())
   })
-  page.on('pageerror', (error) => pageErrors.push(error.message))
+  page.on('pageerror', (error) => {
+    // 留完整堆栈：只记 message 的话，出了"reading 'replace'"这种根本查不出是谁
+    pageErrors.push(`${error.message}\n${(error.stack ?? '').split('\n').slice(1, 4).join('\n')}`)
+  })
 
   let shotIndex = 0
   const shot = async (name) => {
@@ -197,6 +200,23 @@ async function main() {
   const fileRows = await page.locator('.table .tr').count()
   check('大文件榜单有数据', fileRows > 5, `${fileRows} 行`)
   await shot('bigfiles')
+
+  // —— 滚轮能滚（v2.0 的坑：表格把滚动吃掉了）——
+  {
+    const box = await page.locator('.canvas').boundingBox()
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
+    await page.mouse.wheel(0, 600)
+    await page.waitForTimeout(400)
+    const scrolled = await page.evaluate(
+      () => document.querySelector('.view-scroll')?.scrollTop ?? 0
+    )
+    check('大文件页滚轮可滚动', scrolled > 100, `scrollTop=${scrolled}`)
+    await page.evaluate(() => {
+      const node = document.querySelector('.view-scroll')
+      if (node) node.scrollTop = 0
+    })
+  }
+
   await page.locator('.table .tr').first().click()
   await page.waitForTimeout(400)
   check('点行选中并显示详情', (await page.locator('.details').count()) === 1)
@@ -206,7 +226,58 @@ async function main() {
   await page.click('.view-tabs .tab:has-text("文件夹")')
   await page.waitForTimeout(500)
   check('文件夹榜有数据', (await page.locator('.dirs-grid.tr, .tr.dirs-grid').count()) > 2)
+  {
+    // 内容超过一屏就必须能滚；不足一屏就不该出现滚动（两种都算对）
+    const needsScroll = await page.evaluate(() => {
+      const node = document.querySelector('.view-scroll')
+      return node ? node.scrollHeight > node.clientHeight + 4 : false
+    })
+    const box = await page.locator('.canvas').boundingBox()
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
+    await page.mouse.wheel(0, 600)
+    await page.waitForTimeout(400)
+    const scrolled = await page.evaluate(
+      () => document.querySelector('.view-scroll')?.scrollTop ?? 0
+    )
+    check(
+      '文件夹页滚轮行为正常',
+      // 只要有可滚内容，滚轮就必须真能滚（能滚多少取决于溢出多少，别写死 >100）
+      needsScroll ? scrolled > 0 : scrolled === 0,
+      needsScroll ? `可滚，已滚到 ${scrolled}` : '内容不足一屏，无需滚动'
+    )
+    await page.evaluate(() => {
+      const node = document.querySelector('.view-scroll')
+      if (node) node.scrollTop = 0
+    })
+  }
   await shot('folders')
+
+  // —— 文件分类：选一类看全 = 只挑所有 .docx ——
+  await page.click('.view-tabs .tab:has-text("文件分类")')
+  await page.waitForTimeout(600)
+  check('文件分类视图渲染', (await page.locator('.type-chips .type-chip').count()) >= 3)
+  await shot('bytype')
+  await page.locator('.type-chip:has-text("文档")').first().click()
+  await page.waitForTimeout(600)
+  const byTypeRows = await page.locator('.table .tr').count()
+  check('选「文档」列出该类文件', byTypeRows > 0, `${byTypeRows} 行`)
+  check(
+    '分类视图给出总数与合计',
+    /共/.test(await page.locator('.view-bar-stat').first().innerText()),
+    (await page.locator('.view-bar-stat').first().innerText()).replace(/\s+/g, ' ').slice(0, 60)
+  )
+  await shot('bytype-doc')
+  // 再点一次 .docx 后缀芯片（精确到后缀）
+  const docxChip = page.locator('.ext-chip:has-text(".docx")').first()
+  if ((await docxChip.count()) > 0) {
+    await docxChip.click()
+    await page.waitForTimeout(500)
+    const docxRows = await page.locator('.table .tr').count()
+    check('按 .docx 精确筛选', docxRows > 0, `${docxRows} 行`)
+    await shot('bytype-docx')
+  } else {
+    check('按 .docx 精确筛选', false, '没找到 .docx 芯片')
+  }
 
   // —— 清理建议 ——
   await page.click('.view-tabs .tab:has-text("清理建议")')
@@ -221,7 +292,7 @@ async function main() {
     await page.waitForTimeout(350)
     check('清理组可展开看清单', (await page.locator('.cleanup-item').count()) > 0)
     await shot('cleanup-expanded')
-    // 点"清理"应弹出二次确认（不真的删）
+    // 点"清理"应弹出二次确认（先不删）
     await page.locator('.cleanup-card').first().locator('.btn.danger.sm').click()
     await page.waitForTimeout(400)
     check('清理前有二次确认弹窗', (await page.locator('.modal-overlay .modal').count()) === 1)
@@ -229,7 +300,60 @@ async function main() {
     await page.locator('.modal-actions .btn:not(.danger)').click()
     await page.waitForTimeout(250)
     check('取消确认后弹窗关闭', (await page.locator('.modal-overlay').count()) === 0)
+
+    // —— 真删一批：验证批量进度条（删的是夹具里的临时文件，删掉也无所谓）——
+    await page.locator('.cleanup-card').first().locator('.btn.danger.sm').click()
+    await page.waitForTimeout(300)
+    await page.locator('.modal-actions .btn.danger').click()
+    // 进度条要么立刻出现，要么删得太快已经收起了——两种都算通过，但要能观察到结果
+    const progressSeen =
+      (await page.locator('.trash-progress').count()) > 0
+        ? true
+        : await page
+            .waitForSelector('.trash-progress', { timeout: 2500 })
+            .then(() => true)
+            .catch(() => false)
+    check('批量删除显示进度条', progressSeen)
+    await shot('trash-progress')
+    await page
+      .waitForSelector('.trash-progress', { state: 'detached', timeout: 8000 })
+      .catch(() => undefined)
+    check('删除完成后进度条自动收起', (await page.locator('.trash-progress').count()) === 0)
   }
+
+  // —— 回收站视图 ——
+  await page.click('.view-tabs .tab:has-text("回收站")')
+  await page.waitForTimeout(500)
+  check('回收站视图渲染', (await page.locator('.trash-hero').count()) === 1)
+  // 回收站可能有几千条记录，读取要几秒：等列表或空状态出现，别只等固定时间
+  await page.waitForTimeout(400)
+  const trashSettled = await page
+    .waitForFunction(
+      () =>
+        document.querySelectorAll('.trash-grid.tr').length > 0 ||
+        document.querySelector('.empty-state') !== null,
+      { timeout: 30_000 }
+    )
+    .then(() => true)
+    .catch(() => false)
+  const trashRows = await page.locator('.trash-grid.tr').count()
+  const trashEmpty = await page.locator('.empty-state').count()
+  check(
+    '回收站能列出（或说明为空）',
+    trashSettled && (trashRows > 0 || trashEmpty > 0),
+    `${trashRows} 条${trashEmpty ? '（空状态）' : ''}`
+  )
+  const trashTotal = await page.locator('.trash-hero-size').innerText()
+  check('回收站给出占用合计', trashTotal.length > 0, trashTotal)
+  await shot('trash')
+  // 精确检测彩色 emoji（\p{Extended_Pictographic} 会把 ✅⚠️❌ 这类抓出来，
+  // 但不会误伤 ✕、全角标点这些单色符号）
+  const hasEmoji = await page.evaluate(() =>
+    /[\p{Extended_Pictographic}\u{FE0F}]/u.test(document.body.innerText)
+  )
+  check('界面文字里没有彩色 emoji', !hasEmoji)
+  const svgCount = await page.locator('svg').count()
+  check('界面用的是 SVG 图标', svgCount > 20, `${svgCount} 个 svg`)
 
   // —— 旭日图 ——
   await page.click('.view-tabs .tab:has-text("旭日图")')

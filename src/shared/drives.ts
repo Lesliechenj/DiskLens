@@ -3,10 +3,15 @@
 
 import type { DriveInfo } from './types'
 
+/** 盘符显示名：把 "C:\\" 里的盘符抽出来（脏数据也不会把界面搞崩） */
+export function driveLetter(drive: DriveInfo): string {
+  return (drive.label ?? drive.path ?? '').replace(':', '')
+}
+
 /** 把盘符根路径转成中文名，如 "C:\\" → "C 盘" */
 export function driveTitle(drive: DriveInfo): string {
-  if (/^[a-zA-Z]:/.test(drive.path)) return `${drive.label.replace(':', '')} 盘`
-  return drive.label || drive.path
+  if (/^[a-zA-Z]:/.test(drive.path ?? '')) return `${driveLetter(drive)} 盘`
+  return drive.label || drive.path || ''
 }
 
 /** 已用比例（0–1），容量未知时按 0 处理 */

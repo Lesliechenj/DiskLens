@@ -48,13 +48,13 @@ export function ScanBar(): React.JSX.Element {
               onClick={() => setPath('')}
               aria-label="清空路径"
             >
-              <Icon name="x" size={12} />
+              <Icon name="close" size={12} />
             </button>
           )}
         </div>
 
         <button className="btn" onClick={() => void handlePick()} disabled={scanning}>
-          <Icon name="folder-open" size={14} /> 选文件夹
+          <Icon name="folderOpen" size={14} /> 选文件夹
         </button>
 
         {scanning ? (
