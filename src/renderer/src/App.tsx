@@ -1,162 +1,263 @@
-import { useEffect, useState } from 'react'
+// 应用外壳：标题栏 + 侧栏 + 工作区（扫描栏/工具栏/视图/详情）+ 状态栏
+// 这里是"拼装 + 全局快捷键 + 拖拽投放 + 主题落地"的地方，业务逻辑都在 store/lib
+
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useScanStore } from './store/scanStore'
-import { ResultPanel } from './components/ResultPanel'
-import { formatBytes, formatCount, formatDuration } from '../../shared/format'
-import { DEFAULT_EXCLUDE_DIRS, DEFAULT_EXCLUDE_NAMES } from '../../shared/excludes'
-import { pathErrorMessage } from '../../shared/paths'
-import './assets/app.css'
+import { useSettingsStore } from './store/settingsStore'
+import { useUiStore, toast } from './store/uiStore'
+import { useStartScan } from './hooks/useStartScan'
+import { TitleBar } from './components/TitleBar'
+import { Sidebar } from './components/Sidebar'
+import { ScanBar } from './components/ScanBar'
+import { Toolbar } from './components/Toolbar'
+import { StatusBar } from './components/StatusBar'
+import { DetailsPanel } from './components/DetailsPanel'
+import { WelcomeScreen } from './components/WelcomeScreen'
+import { ScanningPanel } from './components/ScanningPanel'
+import { SettingsDialog } from './components/SettingsDialog'
+import { AboutDialog } from './components/AboutDialog'
+import { SkippedDialog } from './components/SkippedDialog'
+import { TrashConfirm } from './components/TrashConfirm'
+import { ToastHost } from './components/ui/ToastHost'
+import { TreemapView } from './components/views/TreemapView'
+import { SunburstView } from './components/views/SunburstView'
+import { TypesView } from './components/views/TypesView'
+import { BigFilesView } from './components/views/BigFilesView'
+import { FoldersView } from './components/views/FoldersView'
+import { CleanupView } from './components/views/CleanupView'
+import { Icon } from './components/icons'
+import { exportReport } from './lib/exportReport'
+import { formatBytes } from '../../shared/format'
+import { parentDirOf } from '../../shared/paths'
 
 function App(): React.JSX.Element {
-  const [rootPath, setRootPath] = useState('')
-  // F6 排除清单：默认勾选，防误扫（手滑选 C 盘也不拖 Windows 进来）
-  const [excludes, setExcludes] = useState<string[]>(DEFAULT_EXCLUDE_NAMES)
-  const { status, progress, result, error, setProgress, setDone, setError, reset } = useScanStore()
+  const init = useSettingsStore((state) => state.init)
+  const dark = useSettingsStore((state) => state.dark)
+  const rememberPath = useSettingsStore((state) => state.settings.rememberPath)
+  const lastPath = useSettingsStore((state) => state.settings.lastPath)
+  const sidebarOpen = useUiStore((state) => state.sidebarOpen)
+  const detailsOpen = useUiStore((state) => state.detailsOpen)
+  const status = useScanStore((state) => state.status)
+  const result = useScanStore((state) => state.result)
+  const view = useScanStore((state) => state.view)
+  const selected = useScanStore((state) => state.selected)
+  const startScan = useStartScan()
+  const [dragging, setDragging] = useState(false)
 
-  // 订阅 IPC：扫描进程 → 主进程 → 这里
+  // 主题落到 <html data-theme>：CSS 变量全套跟着换
   useEffect(() => {
-    window.api.onScanProgress(setProgress)
-    window.api.onScanDone(setDone)
-    window.api.onScanError(setError)
-  }, [setProgress, setDone, setError])
+    const root = document.documentElement
+    root.dataset.theme = dark ? 'dark' : 'light'
+    root.style.colorScheme = dark ? 'dark' : 'light'
+  }, [dark])
 
-  const handleSelect = async (): Promise<void> => {
-    const path = await window.api.selectDirectory()
-    if (path) setRootPath(path)
-  }
+  // 一次性初始化：读设置 + 读磁盘容量
+  useEffect(() => {
+    void init()
+  }, [init])
 
-  const handleStart = async (): Promise<void> => {
-    const target = rootPath.trim()
-    if (!target || status === 'scanning') return
-    // 新手自测发现的第一坑：把「C盘」当路径输、选个文件就来扫——
-    // 先校验，用大白话告诉他哪儿错了，别甩 ENOENT
-    const check = await window.api.checkPath(target)
-    const problem = pathErrorMessage(check)
-    if (problem) {
-      useScanStore.setState({ status: 'error', error: problem })
-      return
+  // 窗口标题跟着当前扫描的根目录走（任务栏里也能看出在看哪个盘）
+  const rootPath = useScanStore((state) => state.result?.root.path)
+  useEffect(() => {
+    document.title = rootPath ? `DiskLens — ${rootPath}` : 'DiskLens'
+  }, [rootPath])
+
+  // 扫描进程 → 主进程 → 这里
+  useEffect(() => {
+    const offProgress = window.api.onScanProgress((progress) =>
+      useScanStore.getState().setProgress(progress)
+    )
+    const offDone = window.api.onScanDone((scanResult) => {
+      useScanStore.getState().setDone(scanResult)
+      toast(
+        'ok',
+        `扫描完成：${formatBytes(scanResult.root.size)}，用了 ${(
+          scanResult.durationMs / 1000
+        ).toFixed(1)} 秒`
+      )
+      // 扫完可用空间可能变了，顺手刷新一下磁盘列表
+      void useSettingsStore.getState().refreshDrives()
+    })
+    const offError = window.api.onScanError((message) => {
+      useScanStore.getState().setError(message)
+      toast('err', message)
+      void useSettingsStore.getState().refreshDrives()
+    })
+    const offCancelled = window.api.onScanCancelled(() => {
+      useScanStore.getState().setCancelled()
+      toast('info', '扫描已取消，没有保留半截结果')
+    })
+    return () => {
+      offProgress()
+      offDone()
+      offError()
+      offCancelled()
     }
-    useScanStore.setState({ status: 'scanning', progress: null, result: null, error: null })
-    window.api.startScan(target, excludes)
-  }
+  }, [])
 
-  const toggleExclude = (name: string): void => {
-    setExcludes((prev) => (prev.includes(name) ? prev.filter((n) => n !== name) : [...prev, name]))
-  }
+  // 快捷键：Ctrl+O 选文件夹 / Ctrl+F 搜索 / F5 重扫 / Ctrl+, 设置 / Ctrl+E 导出
+  //         Esc 关弹窗 / Backspace 或 Alt+← 返回上一层
+  useEffect(() => {
+    const isTyping = (target: EventTarget | null): boolean => {
+      const element = target as HTMLElement | null
+      if (!element) return false
+      const tag = element.tagName
+      return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || element.isContentEditable
+    }
+
+    const onKey = (event: KeyboardEvent): void => {
+      const scan = useScanStore.getState()
+      const ui = useUiStore.getState()
+      const mod = event.ctrlKey || event.metaKey
+
+      if (event.key === 'Escape') {
+        if (ui.trashTargets) ui.clearTrash()
+        else if (ui.skippedOpen) ui.closeSkipped()
+        else if (ui.settingsOpen) ui.closeSettings()
+        else if (ui.aboutOpen) ui.closeAbout()
+        else if (scan.selected) scan.select(null)
+        return
+      }
+
+      if (mod && event.key.toLowerCase() === 'o') {
+        event.preventDefault()
+        void window.api.selectDirectory().then((picked) => {
+          if (picked) void startScan(picked)
+        })
+        return
+      }
+      if (mod && event.key.toLowerCase() === 'f') {
+        event.preventDefault()
+        window.dispatchEvent(new Event('disklens:focus-search'))
+        return
+      }
+      if (mod && event.key === ',') {
+        event.preventDefault()
+        ui.openSettings()
+        return
+      }
+      if (mod && event.key.toLowerCase() === 'e') {
+        event.preventDefault()
+        void exportReport()
+        return
+      }
+      if (event.key === 'F5') {
+        event.preventDefault()
+        const target =
+          scan.breadcrumb.length > 0 ? scan.breadcrumb[0].path : rememberPath ? lastPath : ''
+        if (target) void startScan(target)
+        else toast('info', '还没有扫过东西，先选一个磁盘或文件夹')
+        return
+      }
+      if (
+        (event.key === 'Backspace' || (event.altKey && event.key === 'ArrowLeft')) &&
+        !isTyping(event.target)
+      ) {
+        if (scan.breadcrumb.length > 1) {
+          event.preventDefault()
+          scan.popTo(scan.breadcrumb.length - 2)
+        }
+      }
+    }
+
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [startScan, rememberPath, lastPath])
+
+  // 拖拽文件夹进来就扫：拖拽只是"更方便的选目录"
+  const handleDrop = useCallback(
+    async (event: DragEvent): Promise<void> => {
+      event.preventDefault()
+      setDragging(false)
+      const file = event.dataTransfer?.files?.[0]
+      if (!file) return
+      const path = window.api.getPathForFile(file)
+      if (!path) {
+        toast('err', '拿不到这个文件的位置，试试用「选文件夹」按钮')
+        return
+      }
+      // 拖进来的可能是文件：扫它所在的文件夹
+      const check = await window.api.checkPath(path)
+      const target = check.isDir ? path : parentDirOf(path)
+      await startScan(target)
+    },
+    [startScan]
+  )
+
+  useEffect(() => {
+    const onDragOver = (event: DragEvent): void => {
+      event.preventDefault()
+      if (event.dataTransfer) event.dataTransfer.dropEffect = 'copy'
+      setDragging(true)
+    }
+    const onDragLeave = (event: DragEvent): void => {
+      if (event.relatedTarget === null || event.clientX <= 0 || event.clientY <= 0)
+        setDragging(false)
+    }
+    const onDrop = (event: DragEvent): void => {
+      void handleDrop(event)
+    }
+    window.addEventListener('dragover', onDragOver)
+    window.addEventListener('dragleave', onDragLeave)
+    window.addEventListener('drop', onDrop)
+    return () => {
+      window.removeEventListener('dragover', onDragOver)
+      window.removeEventListener('dragleave', onDragLeave)
+      window.removeEventListener('drop', onDrop)
+    }
+  }, [handleDrop])
+
+  const content = useMemo(() => {
+    if (status === 'scanning' && !result) return <ScanningPanel />
+    if (!result) return <WelcomeScreen />
+    switch (view) {
+      case 'sunburst':
+        return <SunburstView />
+      case 'types':
+        return <TypesView />
+      case 'bigfiles':
+        return <BigFilesView />
+      case 'folders':
+        return <FoldersView />
+      case 'cleanup':
+        return <CleanupView />
+      case 'treemap':
+      default:
+        return <TreemapView />
+    }
+  }, [status, result, view])
 
   return (
-    <div className="app">
-      <header className="app-header">
-        <h1>DiskLens</h1>
-        <span className="badge">v1.1</span>
-      </header>
-
-      <section className="panel">
-        <div className="path-row">
-          <input
-            value={rootPath}
-            onChange={(e) => setRootPath(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && void handleStart()}
-            placeholder="输入目录路径（如 C:/Users/你/Downloads），或点右侧按钮选择"
-            spellCheck={false}
-          />
-          <button onClick={handleSelect}>选择目录</button>
+    <div
+      className={`app-shell${sidebarOpen ? '' : ' no-sidebar'}${detailsOpen ? '' : ' no-details'}`}
+    >
+      <TitleBar />
+      <div className="app-body">
+        {sidebarOpen && <Sidebar />}
+        <main className="workspace">
+          <ScanBar />
+          {result && <Toolbar />}
+          <div className="workspace-main">
+            <section className="canvas">{content}</section>
+            {selected && detailsOpen && <DetailsPanel />}
+          </div>
+        </main>
+      </div>
+      <StatusBar />
+      <ToastHost />
+      <SettingsDialog />
+      <AboutDialog />
+      <SkippedDialog />
+      <TrashConfirm />
+      {dragging && (
+        <div className="drop-overlay">
+          <div className="drop-card">
+            <Icon name="folder-open" size={26} />
+            <b>松开就开始扫描这个文件夹</b>
+            <span>只会读取文件大小，不会动你的文件</span>
+          </div>
         </div>
-        <button
-          className="primary"
-          disabled={status === 'scanning' || !rootPath.trim()}
-          onClick={() => void handleStart()}
-        >
-          {status === 'scanning' ? '扫描中…' : '开始扫描'}
-        </button>
-
-        <details className="excludes">
-          <summary>
-            排除清单（已勾选 {excludes.length}/{DEFAULT_EXCLUDE_DIRS.length} 项，默认跳过防误扫）
-          </summary>
-          <div className="exclude-list">
-            {DEFAULT_EXCLUDE_DIRS.map((item) => (
-              <label key={item.name} className="exclude-item">
-                <input
-                  type="checkbox"
-                  checked={excludes.includes(item.name)}
-                  onChange={() => toggleExclude(item.name)}
-                />
-                <span className="exclude-name">{item.name}</span>
-                <span className="exclude-desc">{item.desc}</span>
-              </label>
-            ))}
-          </div>
-        </details>
-      </section>
-
-      {status === 'scanning' && (
-        <section className="panel">
-          <h2>扫描中</h2>
-          <div className="progress-track">
-            <div className="progress-indeterminate" />
-          </div>
-          <p className="progress-text">
-            已扫描 <b>{formatCount(progress?.files ?? 0)}</b> 个文件 ·{' '}
-            <b>{formatCount(progress?.dirs ?? 0)}</b> 个目录 ·{' '}
-            <b>{formatBytes(progress?.bytes ?? 0)}</b>
-          </p>
-          <p className="current-path" title={progress?.currentPath}>
-            当前：{progress?.currentPath ?? '准备中…'}
-          </p>
-        </section>
       )}
-
-      {status === 'done' && result && (
-        <section className="panel">
-          <h2>扫描完成</h2>
-          <p className="summary">
-            总计 <b>{formatBytes(result.root.size)}</b> · 耗时{' '}
-            <b>{formatDuration(result.durationMs)}</b>
-            {result.excluded > 0 && (
-              <>
-                {' · '}
-                <span className="skipped-hint">已跳过 {result.excluded} 个排除目录</span>
-              </>
-            )}
-            {result.skipped.length > 0 && (
-              <>
-                {' · '}
-                <span className="skipped-hint">
-                  ⚠️ {result.skipped.length} 个目录无权限，已自动跳过
-                </span>
-              </>
-            )}
-          </p>
-          {result.root.size === 0 && (
-            <p className="empty-hint">
-              这个目录是空的，或者里面的内容都被排除清单挡掉了。
-              {result.excluded > 0 ? '（被排除了 ' + result.excluded + ' 个目录）' : ''}
-              换个有内容的文件夹试试。
-            </p>
-          )}
-          <ResultPanel />
-          {result.skipped.length > 0 && (
-            <details className="skipped-details">
-              <summary>查看跳过的 {result.skipped.length} 个目录</summary>
-              <ul>
-                {result.skipped.map((p) => (
-                  <li key={p}>{p}</li>
-                ))}
-              </ul>
-            </details>
-          )}
-        </section>
-      )}
-
-      {status === 'error' && (
-        <section className="panel error-panel">
-          <h2>扫描失败</h2>
-          <p>{error}</p>
-          <button onClick={reset}>重试</button>
-        </section>
-      )}
-
-      <footer className="app-footer">仅供参考，重要文件请自行备份 · DiskLens v1.1</footer>
     </div>
   )
 }

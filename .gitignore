@@ -7,6 +7,14 @@ out
 *.tsbuildinfo
 .npm-cache
 
-# 本地工作记录，不进仓库
+# 本地工作记录 / 冒烟夹具，不进仓库
 .workbuddy
 .tmp-smoke/
+.tmp-e2e-fixture/
+
+# 打包产物
+release/
+*.exe
+*.dmg
+*.AppImage
+*.snap

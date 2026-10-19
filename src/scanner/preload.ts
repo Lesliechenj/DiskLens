@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import { scanDirectory } from './scan'
+import { ScanCancelledError, scanDirectory } from './scan'
 import type { ScanProgress, ScanResult } from '../shared/types'
 
 /**
@@ -8,8 +8,11 @@ import type { ScanProgress, ScanResult } from '../shared/types'
  * （fs / path），不受渲染进程 nodeIntegration 限制。
  */
 
-// 进度上报节流：每 200ms 最多一条，避免高频 IPC 拖慢扫描本身
-const PROGRESS_INTERVAL_MS = 200
+// 进度上报节流：每 150ms 最多一条，避免高频 IPC 拖慢扫描本身
+const PROGRESS_INTERVAL_MS = 150
+
+/** 当前扫描是否被用户取消（主进程发 scan:cancel 置位） */
+let cancelRequested = false
 
 /** 扫描进程 IPC 桥（暴露给隐藏窗口页面） */
 const scanBridge = {
@@ -21,6 +24,9 @@ const scanBridge = {
   },
   sendError: (message: string): void => {
     ipcRenderer.send('scan:error', message)
+  },
+  sendCancelled: (): void => {
+    ipcRenderer.send('scan:cancelled')
   }
 }
 
@@ -31,8 +37,14 @@ if (process.contextIsolated) {
   window.scanBridge = scanBridge
 }
 
+// 主进程可以随时叫停（用户点了"取消扫描"）
+ipcRenderer.on('scan:cancel', () => {
+  cancelRequested = true
+})
+
 // 监听主进程下发的扫描指令，执行扫描并回传进度/结果
 ipcRenderer.on('scan:run', async (_event, rootPath: string, excludeNames: string[] = []) => {
+  cancelRequested = false
   let lastSentAt = 0
   try {
     const result = await scanDirectory(
@@ -44,10 +56,19 @@ ipcRenderer.on('scan:run', async (_event, rootPath: string, excludeNames: string
           scanBridge.sendProgress({ ...progress })
         }
       },
-      { excludeNames }
+      { excludeNames, shouldStop: () => cancelRequested }
     )
+    // 取消发生在最后一个目录之后也算取消：结果不完整，不能当成功交付
+    if (cancelRequested) {
+      scanBridge.sendCancelled()
+      return
+    }
     scanBridge.sendDone(result)
   } catch (error) {
+    if (error instanceof ScanCancelledError || cancelRequested) {
+      scanBridge.sendCancelled()
+      return
+    }
     scanBridge.sendError(error instanceof Error ? error.message : String(error))
   }
 })

@@ -12,9 +12,9 @@ export type PreviewKind = 'image' | 'text' | 'none' | 'toobig' | 'error'
 
 /** 文件预览结果（主进程读文件后经 IPC 返回给渲染层） */
 export type PreviewResult =
-  | { kind: 'image'; dataUrl: string }
-  | { kind: 'text'; text: string }
-  | { kind: Exclude<PreviewKind, 'image' | 'text'>; message?: string }
+  | { kind: 'image'; dataUrl: string; bytes?: number }
+  | { kind: 'text'; text: string; bytes?: number }
+  | { kind: Exclude<PreviewKind, 'image' | 'text'>; message?: string; bytes?: number }
 
 const IMAGE_EXTS = new Set(['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'ico', 'svg'])
 

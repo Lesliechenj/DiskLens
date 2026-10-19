@@ -16,14 +16,20 @@ export function friendlyError(action: string, error: unknown): string {
   if (/ENOENT|no such file/i.test(raw)) {
     return `${action}失败：文件已经不见了（可能刚被移走或删掉）`
   }
-  if (/EACCES|EPERM|permission denied/i.test(raw)) {
+  if (/EACCES|EPERM|permission denied|Access is denied/i.test(raw)) {
     return `${action}失败：没有权限。试试右键 DiskLens →「以管理员身份运行」`
   }
-  if (/EBUSY|is being used/i.test(raw)) {
+  if (/EBUSY|is being used|in use/i.test(raw)) {
     return `${action}失败：文件正被别的程序占着，先关掉那个程序再试`
   }
+  if (/ENOSPC/i.test(raw)) {
+    return `${action}失败：磁盘空间不足`
+  }
+  if (/EROFS|read-only/i.test(raw)) {
+    return `${action}失败：这个位置是只读的（光盘/只读 U 盘），删不了东西`
+  }
   if (/路径是空的/.test(raw)) {
-    return `${action}失败：没有选中任何文件，先点一个色块或排行榜里的条目`
+    return `${action}失败：没有选中任何文件，先点一个色块或列表里的条目`
   }
   return `${action}失败：${raw}`
 }

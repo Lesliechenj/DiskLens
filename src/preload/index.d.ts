@@ -1,26 +1,55 @@
-import { ElectronAPI } from '@electron-toolkit/preload'
-import type { ScanProgress, ScanResult } from '../shared/types'
+import type { ElectronAPI } from '@electron-toolkit/preload'
+import type {
+  AppSettings,
+  DriveInfo,
+  ExportPayload,
+  ScanProgress,
+  ScanResult,
+  TrashOutcome
+} from '../shared/types'
 import type { PathCheckResult } from '../shared/paths'
 import type { PreviewResult } from '../shared/previewKinds'
+
+export interface ScanStartResult {
+  ok: boolean
+  message?: string
+  recentPaths?: string[]
+}
+
+export interface AppInfo {
+  version: string
+  platform: string
+  electron: string
+  isDev: boolean
+}
+
+/** 渲染层可见的 preload API（与 src/preload/index.ts 的 api 对象一一对应） */
+export interface DiskLensApi {
+  selectDirectory: () => Promise<string | null>
+  checkPath: (targetPath: string) => Promise<PathCheckResult>
+  listDrives: () => Promise<DriveInfo[]>
+  onDrivesUpdated: (cb: (drives: DriveInfo[]) => void) => () => void
+  startScan: (rootPath: string, excludeNames?: string[]) => Promise<ScanStartResult>
+  cancelScan: () => void
+  onScanProgress: (cb: (progress: ScanProgress) => void) => () => void
+  onScanDone: (cb: (result: ScanResult) => void) => () => void
+  onScanError: (cb: (message: string) => void) => () => void
+  onScanCancelled: (cb: () => void) => () => void
+  locateFile: (path: string) => Promise<void>
+  openFile: (path: string) => Promise<void>
+  trashFiles: (paths: string[]) => Promise<TrashOutcome[]>
+  previewFile: (path: string) => Promise<PreviewResult>
+  getSettings: () => Promise<AppSettings>
+  updateSettings: (patch: Partial<AppSettings>) => Promise<AppSettings>
+  exportReport: (payload: ExportPayload) => Promise<string | null>
+  showNodeMenu: (path: string, type: 'file' | 'dir' | 'other') => Promise<string | null>
+  appInfo: () => Promise<AppInfo>
+  getPathForFile: (file: File) => string
+}
 
 declare global {
   interface Window {
     electron: ElectronAPI
-    api: {
-      selectDirectory: () => Promise<string | null>
-      /** 扫描前校验路径：存在吗？是目录吗 */
-      checkPath: (targetPath: string) => Promise<PathCheckResult>
-      /** 发起扫描（excludeNames：排除清单，默认勾选的目录名） */
-      startScan: (rootPath: string, excludeNames?: string[]) => void
-      onScanProgress: (callback: (progress: ScanProgress) => void) => void
-      onScanDone: (callback: (result: ScanResult) => void) => void
-      onScanError: (callback: (message: string) => void) => void
-      /** F5：在资源管理器中定位文件/目录 */
-      locateFile: (path: string) => Promise<void>
-      /** F5：移到回收站（唯一删除路径，主进程不提供直接删除） */
-      trashFile: (path: string) => Promise<void>
-      /** 文件预览：图片 dataURL / 文本头部 */
-      previewFile: (path: string) => Promise<PreviewResult>
-    }
+    api: DiskLensApi
   }
 }

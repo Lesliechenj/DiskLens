@@ -2,22 +2,40 @@ appId: com.disklens.app
 productName: DiskLens
 directories:
   buildResources: build
+# 只打运行时需要的东西：out/ 产物 + resources/ + node_modules 生产依赖
+# 开发期的东西（源码、脚本、文档、测试夹具、打包产物）一律不进 asar
 files:
+  - out/**/*
+  - resources/**/*
+  - package.json
   - '!**/.vscode/*'
-  - '!src/*'
+  - '!src/**/*'
+  - '!scripts/**/*'
+  - '!docs/**/*'
+  - '!.workbuddy/**/*'
+  - '!.tmp-smoke/**/*'
+  - '!.tmp-e2e-fixture/**/*'
+  - '!dist/**/*'
+  - '!release/**/*'
   - '!electron.vite.config.{js,ts,mjs,cjs}'
-  - '!{.eslintcache,eslint.config.mjs,.prettierignore,.prettierrc.yaml,dev-app-update.yml,CHANGELOG.md,README.md}'
-  - '!{.env,.env.*,.npmrc,pnpm-lock.yaml}'
+  - '!{.eslintcache,eslint.config.mjs,.prettierignore,.prettierrc.yaml,dev-app-update.yml,CHANGELOG.md,README.md,CONTRIBUTING.md}'
+  - '!{.env,.env.*,.npmrc,pnpm-lock.yaml,package-lock.json}'
   - '!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}'
 asarUnpack:
-  - 'resources/**'
+  - resources/**
 win:
   executableName: disklens
+  # 目标：NSIS 安装包 + 免安装 zip（方便不想装的人）
+  target:
+    - nsis
+    - zip
 nsis:
   artifactName: ${name}-${version}-setup.${ext}
   shortcutName: ${productName}
   uninstallDisplayName: ${productName}
   createDesktopShortcut: always
+  oneClick: false
+  allowToChangeInstallationDirectory: true
 mac:
   entitlementsInherit: build/entitlements.mac.plist
   extendInfo:

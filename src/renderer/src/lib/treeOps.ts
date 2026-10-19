@@ -1,48 +1,62 @@
 // 前端树操作：移到回收站成功后，把节点从内存树摘掉并沿链扣减大小
-// 纯函数（原地改 root，返回是否命中）——可单测
+// 纯函数（原地改 root）——可单测
 
 import type { ScanNode } from '../../../shared/types'
 
 /**
- * 按路径从树中摘除节点，并把所有祖先的 size 减去该节点大小。
- * 目录的 size = 子节点递归累计，所以摘除后必须逐级扣减，图表才守恒。
+ * 批量按路径从树中摘除节点，并沿祖先链扣减大小与文件计数。
+ * 一次遍历解决，避免"删 200 个文件就遍历 200 遍整棵树"。
  *
- * @returns true = 命中并摘除；false = 路径不存在（或目标是根）
+ * @returns 实际摘除的节点数与被释放的字节数（图表/状态栏据此刷新）
  */
-export function removeNode(root: ScanNode, targetPath: string): boolean {
-  // 栈元素带自己的祖先链（root 在链首，父节点在链尾）
-  const stack: { node: ScanNode; ancestors: ScanNode[] }[] = [{ node: root, ancestors: [] }]
+export function removeNodes(
+  root: ScanNode,
+  targetPaths: Iterable<string>
+): { removed: number; freedBytes: number } {
+  const targets = new Set(targetPaths)
+  if (targets.size === 0) return { removed: 0, freedBytes: 0 }
+  if (targets.has(root.path)) return { removed: 0, freedBytes: 0 }
 
-  let target: ScanNode | null = null
-  let chain: ScanNode[] = []
+  let removed = 0
+  let freedBytes = 0
+
+  /** 后序遍历：先处理孩子，再决定自己要不要留（孩子被摘掉后 size 已经更新） */
+  const stack: { node: ScanNode; visited: boolean }[] = [{ node: root, visited: false }]
   while (stack.length > 0) {
-    const { node, ancestors } = stack.pop()!
-    if (node.path === targetPath) {
-      target = node
-      chain = ancestors
-      break
+    const item = stack.pop()!
+    if (!item.visited) {
+      stack.push({ node: item.node, visited: true })
+      for (const kid of item.node.children ?? []) stack.push({ node: kid, visited: false })
+      continue
     }
-    if (node.children) {
-      const next = [...ancestors, node]
-      for (const c of node.children) stack.push({ node: c, ancestors: next })
+    const node = item.node
+    if (!node.children || node.children.length === 0) continue
+
+    const before = node.children.length
+    let delta = 0
+    const kept: ScanNode[] = []
+    for (const kid of node.children) {
+      if (targets.has(kid.path)) {
+        // 直接命中：整棵摘掉，扣它现在的 size
+        removed++
+        freedBytes += kid.size
+        delta += kid.size
+      } else {
+        kept.push(kid)
+      }
+    }
+    if (kept.length !== before) {
+      node.children = kept
+      node.size = Math.max(0, node.size - delta)
     }
   }
 
-  // 未命中 / 根节点自身 → 不摘除
-  if (!target || target === root) return false
+  return { removed, freedBytes }
+}
 
-  // 从父级摘除
-  const parent = chain[chain.length - 1]
-  if (!parent?.children) return false
-  const idx = parent.children.indexOf(target)
-  if (idx === -1) return false
-  parent.children.splice(idx, 1)
-
-  // 沿祖先链逐级扣减大小（root → … → parent）
-  for (const ancestor of chain) {
-    ancestor.size -= target.size
-  }
-  return true
+/** 单个节点摘除（保留旧语义，内部走批量实现） */
+export function removeNode(root: ScanNode, targetPath: string): boolean {
+  return removeNodes(root, [targetPath]).removed > 0
 }
 
 /**
