@@ -110,6 +110,7 @@ npm install
 ```bash
 npm run build && npm run e2e         # 48 项端到端断言 + 每步截图（.tmp-smoke/shots）
 npm run audit                        # 布局/文案/图表像素审计（.tmp-smoke/audit）
+npm run smoke:recycle                # 回收站 $I 解析单测 + 本机真实回收站兜底
 npm run build:unpack && npm run e2e:packaged   # 打包产物冒烟（asar 里的路径/扫描/回收站）
 ```
 

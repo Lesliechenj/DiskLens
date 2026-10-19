@@ -18,6 +18,7 @@
     "e2e:full": "npm run build && node scripts/e2e.mjs",
     "e2e:packaged": "node scripts/e2e-packaged.mjs",
     "audit": "node scripts/audit.mjs",
+    "smoke:recycle": "node scripts/recyclebin-smoke.mjs",
     "postinstall": "install-electron && electron-builder install-app-deps",
     "build:unpack": "npm run build && electron-builder --dir",
     "build:win": "npm run build && electron-builder --win",
