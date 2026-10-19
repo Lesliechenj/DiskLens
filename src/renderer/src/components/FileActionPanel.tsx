@@ -3,6 +3,7 @@ import { useScanStore } from '../store/scanStore'
 import { formatBytes, formatTime } from '../../../shared/format'
 import type { PreviewResult } from '../../../shared/previewKinds'
 import { extInfo } from '../lib/extDict'
+import { friendlyError } from '../lib/errors'
 import { riskOf } from '../lib/risk'
 import { removeNode } from '../lib/treeOps'
 import { ConfirmModal } from './ConfirmModal'
@@ -55,7 +56,7 @@ export function FileActionPanel(): React.JSX.Element | null {
     try {
       await window.api.locateFile(selectedFile.path)
     } catch (error) {
-      showFlash(false, `定位失败：${error instanceof Error ? error.message : String(error)}`)
+      showFlash(false, friendlyError('定位', error))
     }
   }, [selectedFile, showFlash])
 
@@ -71,7 +72,7 @@ export function FileActionPanel(): React.JSX.Element | null {
       resetView()
       showFlash(true, `已移到回收站：${selectedFile.name}`)
     } catch (error) {
-      showFlash(false, `移到回收站失败：${error instanceof Error ? error.message : String(error)}`)
+      showFlash(false, friendlyError('移到回收站', error))
     }
   }, [selectedFile, result, selectFile, resetView, showFlash])
 

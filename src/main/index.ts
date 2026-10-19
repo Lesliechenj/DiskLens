@@ -4,6 +4,7 @@ import { basename, join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import type { ScanProgress, ScanResult } from '../shared/types'
+import type { PathCheckResult } from '../shared/paths'
 import { imageMime, previewKind, TEXT_HEAD_BYTES, type PreviewKind } from '../shared/previewKinds'
 
 // 关闭硬件加速：部分老旧机器/虚拟机/远程桌面环境下 GPU 进程会直接崩溃
@@ -90,6 +91,16 @@ app.whenReady().then(() => {
       title: '选择要扫描的目录'
     })
     return result.canceled ? null : result.filePaths[0]
+  })
+
+  // IPC：路径校验（扫描前先问一句"这路径对吗"——新手把「C盘」当路径是常态）
+  ipcMain.handle('path:check', async (_event, targetPath: string): Promise<PathCheckResult> => {
+    try {
+      const stat = await fs.stat(targetPath)
+      return { exists: true, isDir: stat.isDirectory() }
+    } catch {
+      return { exists: false, isDir: false }
+    }
   })
 
   // IPC：渲染层发起扫描 → 转发给扫描进程（带排除清单）

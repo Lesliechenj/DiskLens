@@ -1,12 +1,16 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
 import type { ScanProgress, ScanResult } from '../shared/types'
+import type { PathCheckResult } from '../shared/paths'
 import type { PreviewResult } from '../shared/previewKinds'
 
 // Custom APIs for renderer
 const api = {
   /** 打开系统目录选择对话框，返回目录路径或 null（取消） */
   selectDirectory: (): Promise<string | null> => ipcRenderer.invoke('dialog:openDirectory'),
+  /** 扫描前校验路径：存在吗？是目录吗（新手把「C盘」当路径是常态） */
+  checkPath: (targetPath: string): Promise<PathCheckResult> =>
+    ipcRenderer.invoke('path:check', targetPath),
   /** 发起扫描（主进程转发给隐藏扫描进程；excludeNames：排除清单，默认勾选的目录名） */
   startScan: (rootPath: string, excludeNames: string[] = []): void =>
     ipcRenderer.send('scan:start', rootPath, excludeNames),

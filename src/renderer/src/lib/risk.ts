@@ -98,31 +98,34 @@ const DANGER_PATH_SEGMENTS = [
 export function riskOf(node: ScanNode): RiskInfo {
   const name = node.name.toLowerCase()
 
-  // 1) 系统关键文件/目录 → 别动
+  // 1) 系统关键文件/目录名 → 别动（最强信号，优先于一切）
   if (DANGER_FILE_NAMES.has(name) || DANGER_DIR_NAMES.has(name)) return RISK.danger
 
-  const lowerPath = node.path.toLowerCase()
-  for (const seg of DANGER_PATH_SEGMENTS) {
-    if (lowerPath.includes(seg)) return RISK.danger
-  }
-
-  // 2) 程序/安装包/系统组件 → 别动（该用卸载，不是硬删）
-  if (node.type === 'file') {
-    const { category } = extInfo(node.name)
-    if (category === 'program' || category === 'system') return RISK.danger
-  }
-
-  // 3) 缓存/日志/临时/缩略图 → 安全可删
+  // 2) 缓存/日志/临时/缩略图 → 安全可删
+  //    注意这段要在"路径含 AppData → 别动"之前：AppData\Local\Temp 里躺的
+  //    绝大多数是可删的临时文件，不能因为挂在 AppData 名下就判死刑
+  //    （新手自测抓到：Temp 里的度假视频被误标 ❌）
   if (node.type === 'file') {
     const { category } = extInfo(node.name)
     if (category === 'cache') return RISK.safe
     if (name === 'thumbs.db' || name === 'thumbs.db:encryptable') return RISK.safe
   } else {
     if (isCacheDirName(node.name)) return RISK.safe
-    // 路径里带 temp/cache/logs 的目录
-    if (/[\\/](temp|tmp|cache|caches|logs|log)[\\/]/.test(lowerPath)) return RISK.safe
+  }
+  const lowerPath = node.path.toLowerCase()
+  if (/[\\/](temp|tmp|cache|caches|logs|log)[\\/]/.test(lowerPath)) return RISK.safe
+
+  // 3) 路径命中系统关键段 → 别动
+  for (const seg of DANGER_PATH_SEGMENTS) {
+    if (lowerPath.includes(seg)) return RISK.danger
   }
 
-  // 4) 其余都是用户自己的东西 → 谨慎（默认档）
+  // 4) 程序/安装包/系统组件 → 别动（该用卸载，不是硬删）
+  if (node.type === 'file') {
+    const { category } = extInfo(node.name)
+    if (category === 'program' || category === 'system') return RISK.danger
+  }
+
+  // 5) 其余都是用户自己的东西 → 谨慎（默认档）
   return RISK.caution
 }

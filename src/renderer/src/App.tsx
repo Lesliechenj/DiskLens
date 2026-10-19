@@ -3,6 +3,7 @@ import { useScanStore } from './store/scanStore'
 import { ResultPanel } from './components/ResultPanel'
 import { formatBytes, formatCount, formatDuration } from '../../shared/format'
 import { DEFAULT_EXCLUDE_DIRS, DEFAULT_EXCLUDE_NAMES } from '../../shared/excludes'
+import { pathErrorMessage } from '../../shared/paths'
 import './assets/app.css'
 
 function App(): React.JSX.Element {
@@ -23,9 +24,17 @@ function App(): React.JSX.Element {
     if (path) setRootPath(path)
   }
 
-  const handleStart = (): void => {
+  const handleStart = async (): Promise<void> => {
     const target = rootPath.trim()
     if (!target || status === 'scanning') return
+    // 新手自测发现的第一坑：把「C盘」当路径输、选个文件就来扫——
+    // 先校验，用大白话告诉他哪儿错了，别甩 ENOENT
+    const check = await window.api.checkPath(target)
+    const problem = pathErrorMessage(check)
+    if (problem) {
+      useScanStore.setState({ status: 'error', error: problem })
+      return
+    }
     useScanStore.setState({ status: 'scanning', progress: null, result: null, error: null })
     window.api.startScan(target, excludes)
   }
@@ -38,7 +47,7 @@ function App(): React.JSX.Element {
     <div className="app">
       <header className="app-header">
         <h1>DiskLens</h1>
-        <span className="badge">W5 三件套 + 文件操作</span>
+        <span className="badge">v1.1</span>
       </header>
 
       <section className="panel">
@@ -46,7 +55,7 @@ function App(): React.JSX.Element {
           <input
             value={rootPath}
             onChange={(e) => setRootPath(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && handleStart()}
+            onKeyDown={(e) => e.key === 'Enter' && void handleStart()}
             placeholder="输入目录路径（如 C:/Users/你/Downloads），或点右侧按钮选择"
             spellCheck={false}
           />
@@ -55,7 +64,7 @@ function App(): React.JSX.Element {
         <button
           className="primary"
           disabled={status === 'scanning' || !rootPath.trim()}
-          onClick={handleStart}
+          onClick={() => void handleStart()}
         >
           {status === 'scanning' ? '扫描中…' : '开始扫描'}
         </button>
@@ -118,6 +127,13 @@ function App(): React.JSX.Element {
               </>
             )}
           </p>
+          {result.root.size === 0 && (
+            <p className="empty-hint">
+              这个目录是空的，或者里面的内容都被排除清单挡掉了。
+              {result.excluded > 0 ? '（被排除了 ' + result.excluded + ' 个目录）' : ''}
+              换个有内容的文件夹试试。
+            </p>
+          )}
           <ResultPanel />
           {result.skipped.length > 0 && (
             <details className="skipped-details">
@@ -140,7 +156,7 @@ function App(): React.JSX.Element {
         </section>
       )}
 
-      <footer className="app-footer">仅供参考，重要文件请自行备份 · W5 里程碑</footer>
+      <footer className="app-footer">仅供参考，重要文件请自行备份 · DiskLens v1.1</footer>
     </div>
   )
 }

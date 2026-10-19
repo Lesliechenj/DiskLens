@@ -1,5 +1,6 @@
 import { ElectronAPI } from '@electron-toolkit/preload'
 import type { ScanProgress, ScanResult } from '../shared/types'
+import type { PathCheckResult } from '../shared/paths'
 import type { PreviewResult } from '../shared/previewKinds'
 
 declare global {
@@ -7,6 +8,8 @@ declare global {
     electron: ElectronAPI
     api: {
       selectDirectory: () => Promise<string | null>
+      /** 扫描前校验路径：存在吗？是目录吗 */
+      checkPath: (targetPath: string) => Promise<PathCheckResult>
       /** 发起扫描（excludeNames：排除清单，默认勾选的目录名） */
       startScan: (rootPath: string, excludeNames?: string[]) => void
       onScanProgress: (callback: (progress: ScanProgress) => void) => void
