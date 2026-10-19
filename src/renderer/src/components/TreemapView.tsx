@@ -58,7 +58,8 @@ export function TreemapView(): React.JSX.Element {
       <p className="level-hint">
         当前层 <b>{formatCount(visibleCount)}</b> 个直接子项（共 {formatCount(allCount)} 个）
         {filtered && <span className="filtered-flag"> · 已按条件过滤</span>} · 合计{' '}
-        <b>{formatBytes(current.size)}</b> · 块越大占地方越多，点目录块进入下一层，点文件块看预览和操作
+        <b>{formatBytes(current.size)}</b> ·
+        块越大占地方越多，点目录块进入下一层，点文件块看预览和操作
       </p>
       {/* 操作面板常驻图表上方：选中即出现，不用翻页找 */}
       <FileActionPanel />
