@@ -125,6 +125,11 @@ app.whenReady().then(() => {
     shell.showItemInFolder(path)
   })
   ipcMain.handle('file:trash', async (_event, path: string) => {
+    // 空路径守卫：shell.trashItem('') 不会报错也不会返回——直接挂死
+    // （复现实测：卡 4 分钟无响应）。宁可立刻失败，不给用户"假死"。
+    if (typeof path !== 'string' || path.trim() === '') {
+      throw new Error('文件路径是空的，这个操作没法做')
+    }
     await shell.trashItem(path)
   })
 
