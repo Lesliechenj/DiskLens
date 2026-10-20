@@ -67,6 +67,12 @@ const VIEW_GUIDES: ViewGuide[] = [
     when: '同一份资料存了好几处'
   },
   {
+    name: '压缩包',
+    icon: 'archive',
+    what: '按大小列出 zip/rar/7z/iso，ZIP 可直接看内容',
+    when: '想清理下载的安装包/旧压缩包'
+  },
+  {
     name: '清理建议',
     icon: 'broom',
     what: '临时文件/日志/缓存/安装包/空文件夹自动归类',
@@ -172,7 +178,8 @@ export function HelpDialog(): React.JSX.Element | null {
             <h4>安全规则（重要）</h4>
             <ul className="help-safety">
               <li>
-                <Icon name="shield" size={13} /> 删除只会进系统回收站，不提供「直接删除」。
+                <Icon name="shield" size={13} />{' '}
+                默认只进系统回收站；只有你在向导里明确勾选「彻底释放」才会永久删除本次项目。
               </li>
               <li>
                 <Icon name="alert" size={13} />{' '}
@@ -222,10 +229,25 @@ export function HelpDialog(): React.JSX.Element | null {
               </p>
             </details>
             <details className="help-faq">
-              <summary>为什么清理建议里没看到浏览器缓存？</summary>
+              <summary>为什么完整扫描里没看到浏览器缓存？</summary>
               <p>
-                浏览器缓存通常在 AppData 里，而 AppData 默认被排除。想清它，去「设置 →
-                排除清单」取消勾选 AppData， 再重新扫描即可。
+                浏览器缓存在 AppData 里，整盘扫描默认会跳过
+                AppData。用首页或向导里的「快速清理」即可： 它会专门扫描浏览器缓存、Windows
+                Temp、更新缓存等目录，不需要改排除清单。
+              </p>
+            </details>
+            <details className="help-faq">
+              <summary>为什么清理时只弹一次管理员授权？</summary>
+              <p>
+                DiskLens 会把整批路径交给一个提权帮手，用系统批量删除接口一次处理，
+                不会一个文件弹一次 UAC。你取消授权时，整批都不会删除。
+              </p>
+            </details>
+            <details className="help-faq">
+              <summary>清理报告存在哪里？</summary>
+              <p>
+                每次清理完成都会弹出报告；详细 HTML 文件在用户数据目录的 reports 文件夹里，
+                弹窗底部可以直接「查看报告存放路径」或「打开详细报告」。
               </p>
             </details>
           </section>
