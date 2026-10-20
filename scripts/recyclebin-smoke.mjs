@@ -66,7 +66,11 @@ function buildV1(originalPath, size, deletedMs) {
 const deletedAt = Date.UTC(2026, 0, 2, 3, 4, 5)
 
 const v2 = parseTrashInfo(buildV2('C:\\Users\\me\\季度报告.docx', 12345, deletedAt))
-check('v2 版本解析出原始路径', v2?.originalPath === 'C:\\Users\\me\\季度报告.docx', v2?.originalPath)
+check(
+  'v2 版本解析出原始路径',
+  v2?.originalPath === 'C:\\Users\\me\\季度报告.docx',
+  v2?.originalPath
+)
 check('v2 版本解析出大小', v2?.size === 12345, String(v2?.size))
 check(
   'v2 版本解析出删除时间',
@@ -89,7 +93,9 @@ console.log(
     (listing.errors.length ? `，${listing.errors.length} 个目录读不到` : '')
 )
 for (const entry of listing.entries.slice(0, 3)) {
-  console.log(`  · ${entry.name} ← ${entry.originalPath}（${new Date(entry.deletedAt).toISOString()}）`)
+  console.log(
+    `  · ${entry.name} ← ${entry.originalPath}（${new Date(entry.deletedAt).toISOString()}）`
+  )
 }
 check(
   '真实回收站列表结构完整',

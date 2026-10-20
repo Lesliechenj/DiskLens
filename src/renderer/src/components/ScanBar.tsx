@@ -36,7 +36,7 @@ export function ScanBar(): React.JSX.Element {
             onKeyDown={(event) => {
               if (event.key === 'Enter' && !scanning) void startScan(path)
             }}
-            placeholder="输入要扫描的路径（如 C:/Users/你的名字/Downloads），或点右侧选文件夹"
+            placeholder="输入路径，如 C:/Users/你的名字/Downloads；多个位置用 ; 分隔（C:/;D:/;E:/）"
             spellCheck={false}
             disabled={scanning}
             aria-label="扫描路径"

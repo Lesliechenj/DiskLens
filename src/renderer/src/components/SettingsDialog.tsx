@@ -24,6 +24,7 @@ const MIN_SIZE_OPTIONS = [
 export function SettingsDialog(): React.JSX.Element | null {
   const open = useUiStore((state) => state.settingsOpen)
   const close = useUiStore((state) => state.closeSettings)
+  const openWizard = useUiStore((state) => state.openWizard)
   const settings = useSettingsStore((state) => state.settings)
   const patch = useSettingsStore((state) => state.patch)
 
@@ -111,6 +112,56 @@ export function SettingsDialog(): React.JSX.Element | null {
               </button>
               <button className="btn ghost sm" onClick={() => void patch({ excludes: [] })}>
                 全部取消（不推荐）
+              </button>
+            </div>
+          </section>
+
+          <section className="settings-section">
+            <h4>新手模式与清理</h4>
+            <label className="settings-check">
+              <input
+                type="checkbox"
+                checked={settings.beginnerMode}
+                onChange={(event) => void patch({ beginnerMode: event.target.checked })}
+              />
+              <span>新手模式（推荐）：更大的字、文件路径显示在名字下面、顶部一直提示下一步</span>
+            </label>
+            <label className="settings-check">
+              <input
+                type="checkbox"
+                checked={settings.autoSnapshot}
+                onChange={(event) => void patch({ autoSnapshot: event.target.checked })}
+              />
+              <span>扫描完成后自动保存快照（下次打开可以直接恢复，不用重扫）</span>
+            </label>
+            <label className="settings-field">
+              <span>清理时什么时候要管理员授权</span>
+              <select
+                className="select"
+                value={settings.cleanupElevation}
+                onChange={(event) =>
+                  void patch({
+                    cleanupElevation: event.target.value as typeof settings.cleanupElevation
+                  })
+                }
+              >
+                <option value="auto">自动（只有系统目录才授权一次）</option>
+                <option value="always">每次清理都授权一次</option>
+                <option value="never">从不授权（可能删不掉系统缓存）</option>
+              </select>
+            </label>
+            <p className="settings-note">
+              授权是<b>整批一次</b>，不会一个文件弹一次。删掉的东西仍然只进回收站。
+            </p>
+            <div className="settings-row">
+              <button
+                className="btn ghost sm"
+                onClick={() => {
+                  close()
+                  openWizard()
+                }}
+              >
+                <Icon name="sparkle" size={13} /> 再看一遍新手向导
               </button>
             </div>
           </section>

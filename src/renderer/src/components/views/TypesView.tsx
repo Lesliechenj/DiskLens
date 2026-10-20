@@ -1,4 +1,4 @@
-// 类型构成：全盘/当前层按"文件大类"聚合 → 环形图 + 排行表 + 扩展名明细
+// 类型构成：本次扫描/当前层按"文件大类"聚合 → 环形图 + 排行表 + 扩展名明细
 // 回答小白最关心的那句："我的空间到底被什么吃掉了？"
 
 import { useCallback, useMemo, useState } from 'react'
@@ -81,7 +81,7 @@ export function TypesView(): React.JSX.Element {
           <header className="card-head">
             <h3>空间构成</h3>
             <span className="card-sub">
-              全盘 {formatCount(insights.totalFiles)} 个文件 · {insights.exts.length} 种后缀
+              本次扫描 {formatCount(insights.totalFiles)} 个文件 · {insights.exts.length} 种后缀
             </span>
           </header>
           <div className="donut-wrap">
@@ -130,7 +130,7 @@ export function TypesView(): React.JSX.Element {
       <section className="card">
         <header className="card-head">
           <h3>按后缀明细</h3>
-          <span className="card-sub">全盘 · 点一行 = 列出这类文件</span>
+          <span className="card-sub">本次扫描 · 点一行 = 列出这类文件</span>
         </header>
         <div className="ext-table">
           <div className="ext-head">

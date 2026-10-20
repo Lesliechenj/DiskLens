@@ -5,6 +5,7 @@ import { useScanStore } from '../store/scanStore'
 import { useSettingsStore } from '../store/settingsStore'
 import { useUiStore } from '../store/uiStore'
 import { formatBytes, formatCount, formatDuration } from '../../../shared/format'
+import { formatPathList } from '../../../shared/paths'
 import { Icon } from './icons'
 
 export function StatusBar(): React.JSX.Element {
@@ -15,7 +16,7 @@ export function StatusBar(): React.JSX.Element {
   const info = useSettingsStore((state) => state.info)
   const openSkipped = useUiStore((state) => state.openSkipped)
 
-  const version = info?.version ? `v${info.version}` : 'v2.0.0'
+  const version = info?.version ? `v${info.version}` : '—'
 
   return (
     <footer className="statusbar">
@@ -38,7 +39,9 @@ export function StatusBar(): React.JSX.Element {
         {status === 'done' && result && (
           <>
             <Icon name="check" size={12} />
-            <span title={result.root.path}>{result.root.path}</span>
+            <span title={result.roots.join('; ')}>
+              {result.multi ? `全部磁盘（${formatPathList(result.roots, 3)}）` : result.root.path}
+            </span>
             <span className="dim">·</span>
             <span>{formatBytes(result.root.size)}</span>
             <span className="dim">·</span>

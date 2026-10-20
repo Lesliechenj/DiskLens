@@ -127,7 +127,15 @@ const SAFE_PATH_SEGMENTS = [
   '/shadercache/',
   '/gpu_cache/',
   '/inetcache/',
-  '/webcache/'
+  '/webcache/',
+  // 系统更新/预读/错误报告缓存：删了系统会自己重建
+  '/softwaredistribution/download/',
+  '/softwaredistribution/deliveryoptimization/',
+  '/deliveryoptimization/',
+  '/prefetch/',
+  '/wer/',
+  '/minidump/',
+  '/livekernelreports/'
 ]
 
 /** 目录里装的东西天然可删 → 目录本身也算安全 */

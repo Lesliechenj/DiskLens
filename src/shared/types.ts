@@ -37,8 +37,8 @@ export interface ScanProgress {
 
 /** 扫描请求参数 */
 export interface ScanRequest {
-  /** 要扫描的根路径 */
-  rootPath: string
+  /** 要扫描的根路径（支持一次扫多个盘/多个目录） */
+  rootPaths: string[]
   /** 排除清单：目录名（basename）命中即整棵跳过 */
   excludeNames: string[]
 }
@@ -53,8 +53,12 @@ export interface ScanStats {
 
 /** 扫描完成后的完整结果 */
 export interface ScanResult {
-  /** 根节点（被扫描的目录本身） */
+  /** 根节点（单路径 = 目录本身；多路径 = 「全部磁盘」虚拟根） */
   root: ScanNode
+  /** 这次扫描包含的根路径（用于状态栏/快照/重扫） */
+  roots: string[]
+  /** 是否是一次多路径扫描（根节点为虚拟根） */
+  multi: boolean
   /** 无权限/读取失败被跳过的路径样本（最多 SKIPPED_SAMPLE_LIMIT 条） */
   skipped: string[]
   /** 被跳过的路径总数（样本可能被截断，这个数才是真实值） */
@@ -72,7 +76,93 @@ export type ScanStatus = 'idle' | 'scanning' | 'done' | 'error'
 
 /** 视图类型：同一棵树的多种渲染方式 */
 export type ViewKind =
-  'treemap' | 'sunburst' | 'types' | 'bytype' | 'bigfiles' | 'folders' | 'cleanup' | 'trash'
+  | 'treemap'
+  | 'sunburst'
+  | 'tree'
+  | 'types'
+  | 'bytype'
+  | 'bigfiles'
+  | 'folders'
+  | 'age'
+  | 'duplicates'
+  | 'archives'
+  | 'cleanup'
+  | 'trash'
+
+/** 查重的候选文件（渲染层按大小分组后交给主进程比对内容） */
+export interface DuplicateCandidateFile {
+  /** 完整路径 */
+  path: string
+  /** 修改时间（毫秒时间戳）：UI 用它决定"默认保留哪一份" */
+  mtime: number
+}
+
+/** 查重候选组：大小相同的文件才可能内容相同 */
+export interface DuplicateCandidateGroup {
+  /** 文件大小（字节） */
+  size: number
+  /** 同大小的文件（至少 2 个） */
+  files: DuplicateCandidateFile[]
+}
+
+/** 查重进度（主进程经 IPC 实时上报） */
+export interface DuplicateProgress {
+  /** 阶段：抽样比对 / 完整校验 */
+  phase: 'partial' | 'full'
+  /** 已完成的候选组 / 总候选组 */
+  doneGroups: number
+  totalGroups: number
+  /** 已完成的文件 / 总文件 */
+  doneFiles: number
+  totalFiles: number
+  /** 已读取字节数 */
+  hashedBytes: number
+  /** 当前文件路径 */
+  current: string
+}
+
+/** 一组内容完全相同的文件 */
+export interface DuplicateGroup {
+  /** 稳定 id（用最小路径，React key 用） */
+  id: string
+  /** 文件大小（字节） */
+  size: number
+  /** 组内文件（至少 2 个） */
+  files: DuplicateCandidateFile[]
+  /** 可回收空间 = size × (份数 - 1) */
+  wasted: number
+}
+
+/** 查重结果 */
+export interface DuplicateResult {
+  /** 内容完全相同的组（按可回收空间降序） */
+  groups: DuplicateGroup[]
+  /** 送进来时大小相同的候选组数 */
+  candidateGroups: number
+  /** 参与内容比对的候选文件数 */
+  candidateFiles: number
+  /** 完整校验过的文件数 */
+  hashedFiles: number
+  /** 可回收空间合计 */
+  totalWasted: number
+  /** 耗时（毫秒） */
+  durationMs: number
+  /** 读不了的文件（最多 50 条样本） */
+  errors: string[]
+  /** 读失败的文件总数 */
+  errorCount: number
+}
+
+/** 查重启动结果（主进程 await 整个查重过程后返回） */
+export interface DuplicateStartResult {
+  ok: boolean
+  /** 用户取消 */
+  cancelled?: boolean
+  /** 失败原因 */
+  message?: string
+  /** 成功时的结果 */
+  result?: DuplicateResult
+}
 
 /** 批量移到回收站的单条结果 */
 export interface TrashOutcome {
@@ -161,6 +251,9 @@ export interface WindowBounds {
   maximized: boolean
 }
 
+/** 管理员授权策略 */
+export type CleanupElevation = 'auto' | 'always' | 'never'
+
 /** 应用设置（主进程 JSON 持久化） */
 export interface AppSettings {
   /** 主题：深色 / 浅色 / 跟随系统 */
@@ -171,12 +264,150 @@ export interface AppSettings {
   minChildSize: number
   /** 记住上次扫描的路径 */
   rememberPath: boolean
-  /** 最近一次扫描路径 */
+  /** 最近一次扫描路径（多路径用 ; 分隔） */
   lastPath: string
   /** 最近扫描过的路径（最多 8 条，去重） */
   recentPaths: string[]
   /** 窗口位置尺寸 */
   windowBounds: WindowBounds | null
+  /** 新手模式：更大的字、更明显的下一步引导、路径显示在文件名下面 */
+  beginnerMode: boolean
+  /** 是否已经看过首次新手引导 */
+  onboarded: boolean
+  /** 扫描完成后自动保存快照（下次打开可恢复，不必重扫） */
+  autoSnapshot: boolean
+  /** 清理时何时请求管理员授权（一次授权，整批执行） */
+  cleanupElevation: CleanupElevation
+}
+
+/** 一次清理的目标（文件或目录） */
+export interface CleanupTarget {
+  path: string
+  name: string
+  size: number
+  type: NodeType
+  mtime: number
+  /** 来自哪条清理建议（报告分组用） */
+  groupId?: string
+  groupTitle?: string
+}
+
+/** 清理执行结果里的单条结果 */
+export interface CleanupOutcome {
+  path: string
+  ok: boolean
+  message?: string
+  /** 是否需要管理员权限才能删 */
+  needsAdmin?: boolean
+}
+
+/** 清理报告里的分组汇总 */
+export interface CleanupReportGroup {
+  id: string
+  title: string
+  count: number
+  size: number
+  successCount: number
+}
+
+/** 清理报告（渲染层弹窗 + 主进程 HTML 文件共用） */
+export interface CleanupReport {
+  id: string
+  createdAt: number
+  /** 这次清理的范围说明，如「C: / D: / E:」 */
+  scope: string
+  /** 普通权限 / 管理员授权 */
+  mode: 'normal' | 'elevated'
+  targets: CleanupTarget[]
+  outcomes: CleanupOutcome[]
+  beforeDrives: DriveInfo[]
+  afterDrives: DriveInfo[]
+  groups: CleanupReportGroup[]
+  /** 目标总大小 */
+  totalBytes: number
+  /** 实际释放（成功项） */
+  freedBytes: number
+  itemCount: number
+  successCount: number
+  failedCount: number
+  durationMs: number
+  /** 是否已把本次清理项从回收站彻底删除 */
+  purged?: boolean
+  /** 彻底删除后实际释放的字节数 */
+  purgedBytes?: number
+  /** 从回收站彻底删除的条目数 */
+  purgedCount?: number
+  /** 详细 HTML 报告路径 */
+  reportPath: string
+}
+
+/** 清理执行请求 */
+export interface CleanupExecuteRequest {
+  targets: CleanupTarget[]
+  /** 范围说明（用于报告标题） */
+  scope: string
+  /** 覆盖设置里的授权策略 */
+  elevation?: CleanupElevation
+  /**
+   * 清理后是否把本次项目从回收站彻底删除（不可恢复）。
+   * 只有用户明确勾选时才传 true；默认只进回收站。
+   */
+  purgeAfter?: boolean
+}
+
+/** 清理执行结果 */
+export interface CleanupExecuteResult {
+  ok: boolean
+  report?: CleanupReport
+  /** 用户在 UAC 弹窗里点了取消 */
+  elevationCancelled?: boolean
+  message?: string
+}
+
+/** 扫描快照元信息（首页恢复上次扫描用） */
+export interface SnapshotMeta {
+  path: string
+  createdAt: number
+  roots: string[]
+  totalBytes: number
+  files: number
+  dirs: number
+  /** 快照文件大小（字节） */
+  fileBytes: number
+}
+
+/** 压缩包信息行 */
+export interface ArchiveInfo {
+  path: string
+  name: string
+  size: number
+  mtime: number
+  /** 小写扩展名 */
+  ext: string
+  /** zip 可读出条目数；其它格式为 undefined */
+  entryCount?: number
+  /** zip 解压后总大小 */
+  unpackedBytes?: number
+  /** 读取失败原因 */
+  error?: string
+}
+
+/** 压缩包内容条目（zip 查看器） */
+export interface ArchiveEntry {
+  name: string
+  size: number
+  compressedSize: number
+  isDir: boolean
+}
+
+/** 压缩包内容查看结果 */
+export interface ArchiveInspection {
+  path: string
+  entries: ArchiveEntry[]
+  totalSize: number
+  unpackedBytes: number
+  truncated: boolean
+  error?: string
 }
 
 /** 导出报告：CSV 表格 */

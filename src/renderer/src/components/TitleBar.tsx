@@ -16,6 +16,7 @@ export function TitleBar(): React.JSX.Element {
   const toggleSidebar = useUiStore((state) => state.toggleSidebar)
   const openSettings = useUiStore((state) => state.openSettings)
   const openAbout = useUiStore((state) => state.openAbout)
+  const openHelp = useUiStore((state) => state.openHelp)
   const platform = window.electron?.process?.platform ?? 'win32'
   const reserveControls = platform === 'win32' || platform === 'linux'
 
@@ -68,6 +69,14 @@ export function TitleBar(): React.JSX.Element {
         </button>
         <button className="icon-btn" onClick={openSettings} title="设置" aria-label="设置">
           <Icon name="settings" size={16} />
+        </button>
+        <button
+          className="icon-btn"
+          onClick={openHelp}
+          title="新手帮助（F1）"
+          aria-label="新手帮助"
+        >
+          <Icon name="help" size={16} />
         </button>
         <button className="icon-btn" onClick={openAbout} title="关于 DiskLens" aria-label="关于">
           <Icon name="info" size={16} />

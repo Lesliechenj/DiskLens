@@ -9,8 +9,10 @@ import type {
   ScanProgress,
   ScanResult,
   ScanStatus,
+  SnapshotMeta,
   ViewKind
 } from '../../../shared/types'
+import { isSameOrInsidePath } from '../../../shared/paths'
 import { removeNodes } from '../lib/treeOps'
 import type { TypeQuery } from '../lib/insights'
 
@@ -35,8 +37,15 @@ interface ScanState {
   error: string | null
   /** 本轮扫描开始时间（渲染层算"已跑多久"） */
   startedAt: number
+  /** 扫描代次：每次扫描完成 +1，查重结果据此判断是否过期 */
+  scanId: number
+  /** 最近一次保存的快照（首页可恢复） */
+  snapshotMeta: SnapshotMeta | null
+  setSnapshotMeta: (meta: SnapshotMeta | null) => void
   setProgress: (progress: ScanProgress) => void
   setDone: (result: ScanResult) => void
+  /** 从快照恢复（和扫描完成一样进入 done 状态） */
+  loadResult: (result: ScanResult) => void
   setError: (message: string) => void
   setCancelled: () => void
   /** 开始新一轮扫描（清空旧结果） */
@@ -91,7 +100,10 @@ export const useScanStore = create<ScanState>((set, get) => ({
   result: null,
   error: null,
   startedAt: 0,
+  scanId: 0,
+  snapshotMeta: null,
 
+  setSnapshotMeta: (meta) => set({ snapshotMeta: meta }),
   setProgress: (progress) => set({ progress }),
   setDone: (result) =>
     set({
@@ -103,7 +115,23 @@ export const useScanStore = create<ScanState>((set, get) => ({
       filters: DEFAULT_FILTERS,
       selected: null,
       treeVersion: get().treeVersion + 1,
+      scanId: get().scanId + 1,
       keyword: ''
+    }),
+  loadResult: (result) =>
+    set({
+      status: 'done',
+      result,
+      progress: null,
+      error: null,
+      breadcrumb: [result.root],
+      filters: DEFAULT_FILTERS,
+      selected: null,
+      treeVersion: get().treeVersion + 1,
+      scanId: get().scanId + 1,
+      keyword: '',
+      input: result.roots.join('; '),
+      view: 'treemap'
     }),
   setError: (message) => set({ status: 'error', error: message, progress: null }),
   setCancelled: () => set({ status: 'idle', progress: null, error: null }),
@@ -163,16 +191,25 @@ export const useScanStore = create<ScanState>((set, get) => ({
   treeVersion: 0,
   removePaths: (paths) => {
     const result = get().result
-    if (!result) return { removed: 0, freedBytes: 0 }
+    if (!result) return { removed: 0, freedBytes: 0, removedFiles: 0, removedDirs: 0 }
     const outcome = removeNodes(result.root, paths)
     if (outcome.removed > 0) {
       const selected = get().selected
       const breadcrumb = get().breadcrumb
+      // 统计数字也要跟着减：状态栏、侧栏的"文件/目录"才是真话
+      const stats = {
+        files: Math.max(0, result.stats.files - outcome.removedFiles),
+        dirs: Math.max(0, result.stats.dirs - outcome.removedDirs)
+      }
+      const insideTarget = (path: string): boolean =>
+        paths.some((target) => isSameOrInsidePath(path, target))
       set({
+        // 换一个 result 引用：状态栏订阅的是 result，否则数字不会刷新
+        result: { ...result, stats },
         treeVersion: get().treeVersion + 1,
-        // 被删掉的节点不能再当"当前选中"或面包屑的一层
-        selected: selected && paths.includes(selected.path) ? null : selected,
-        breadcrumb: breadcrumb.filter((node) => !paths.includes(node.path))
+        // 被删掉的节点（以及它里面的子节点）不能再当"当前选中"或面包屑的一层
+        selected: selected && insideTarget(selected.path) ? null : selected,
+        breadcrumb: breadcrumb.filter((node) => !insideTarget(node.path))
       })
     }
     return outcome

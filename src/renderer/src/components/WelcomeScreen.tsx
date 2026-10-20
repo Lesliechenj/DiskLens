@@ -2,8 +2,10 @@
 // 需求文档决策 1：小白打开先看到"哪个盘满了"，点一下就出图
 
 import { useSettingsStore } from '../store/settingsStore'
+import { useScanStore } from '../store/scanStore'
+import { useUiStore, toast } from '../store/uiStore'
 import { useStartScan } from '../hooks/useStartScan'
-import { formatBytes, formatCount } from '../../../shared/format'
+import { formatBytes, formatCount, formatRelativeTime } from '../../../shared/format'
 import { driveLetter, driveTitle, driveUsageLevel, driveUsageRatio } from '../../../shared/drives'
 import { Icon } from './icons'
 
@@ -11,11 +13,33 @@ export function WelcomeScreen(): React.JSX.Element {
   const drives = useSettingsStore((state) => state.drives)
   const drivesLoading = useSettingsStore((state) => state.drivesLoading)
   const refreshDrives = useSettingsStore((state) => state.refreshDrives)
+  const onboarded = useSettingsStore((state) => state.settings.onboarded)
+  const snapshotMeta = useScanStore((state) => state.snapshotMeta)
+  const loadResult = useScanStore((state) => state.loadResult)
+  const setSnapshotMeta = useScanStore((state) => state.setSnapshotMeta)
+  const openWizard = useUiStore((state) => state.openWizard)
   const startScan = useStartScan()
 
   const pickFolder = async (): Promise<void> => {
     const picked = await window.api.selectDirectory()
     if (picked) await startScan(picked)
+  }
+
+  const scanAll = (): void => {
+    const paths = drives.filter((drive) => !drive.removable).map((drive) => drive.path)
+    if (paths.length > 0) void startScan(paths)
+    else void startScan('C:/')
+  }
+
+  const restoreSnapshot = async (): Promise<void> => {
+    const loaded = await window.api.loadSnapshot().catch(() => null)
+    if (!loaded) {
+      toast('err', '快照读不出来，重新扫描一次吧')
+      return
+    }
+    loadResult(loaded)
+    setSnapshotMeta(null)
+    toast('ok', '已恢复上次扫描结果，不用重新扫盘')
   }
 
   return (
@@ -27,7 +51,46 @@ export function WelcomeScreen(): React.JSX.Element {
         <p className="welcome-sub">
           块越大 = 占地方越多。扫完之后能一眼看出空间去哪了，还能安全清掉缓存和垃圾。
         </p>
+        <div className="welcome-actions">
+          <button className="btn primary" onClick={scanAll}>
+            <Icon name="drive" size={15} /> 扫描全部磁盘
+          </button>
+          <button className="btn" onClick={openWizard}>
+            <Icon name="sparkle" size={15} /> 新手向导（推荐）
+          </button>
+        </div>
       </div>
+
+      {!onboarded && (
+        <div className="welcome-onboarding">
+          <div className="welcome-onboarding-icon">
+            <Icon name="sparkle" size={20} />
+          </div>
+          <div className="welcome-onboarding-body">
+            <b>第一次用，不知道从哪下手？</b>
+            <p>跟着新手向导走 3 步：选磁盘 → 自动扫描 → 只清理推荐项。全程只进回收站。</p>
+          </div>
+          <button className="btn primary sm" onClick={openWizard}>
+            开始 3 步向导 <Icon name="chevronRight" size={13} />
+          </button>
+        </div>
+      )}
+
+      {snapshotMeta && (
+        <button className="welcome-snapshot" onClick={() => void restoreSnapshot()}>
+          <Icon name="clock" size={18} />
+          <span className="welcome-snapshot-body">
+            <b>恢复上次扫描结果</b>
+            <em>
+              {formatRelativeTime(snapshotMeta.createdAt)} · {formatBytes(snapshotMeta.totalBytes)}{' '}
+              · {formatCount(snapshotMeta.files)} 个文件，不用重新扫盘
+            </em>
+          </span>
+          <span className="welcome-snapshot-go">
+            立即恢复 <Icon name="chevronRight" size={13} />
+          </span>
+        </button>
+      )}
 
       <div className="welcome-section-head">
         <h2>我的磁盘</h2>

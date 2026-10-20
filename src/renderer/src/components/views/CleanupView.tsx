@@ -4,6 +4,7 @@
 import { useMemo, useState } from 'react'
 import { useCleanupGroups } from '../../hooks/useDerived'
 import { useScanStore } from '../../store/scanStore'
+import { useSettingsStore } from '../../store/settingsStore'
 import { useUiStore } from '../../store/uiStore'
 import { useNodeMenu } from '../../hooks/useNodeMenu'
 import {
@@ -23,8 +24,11 @@ export function CleanupView(): React.JSX.Element {
   const result = useScanStore((state) => state.result)
   const select = useScanStore((state) => state.select)
   const requestTrash = useUiStore((state) => state.requestTrash)
+  const openSettings = useUiStore((state) => state.openSettings)
+  const excludes = useSettingsStore((state) => state.settings.excludes)
   const openMenu = useNodeMenu()
   const [expanded, setExpanded] = useState<string | null>(null)
+  const appDataSkipped = excludes.some((name) => name.toLowerCase() === 'appdata')
 
   const totalSize = useMemo(() => groups.reduce((sum, group) => sum + group.totalSize, 0), [groups])
   const totalCount = useMemo(() => groups.reduce((sum, group) => sum + group.count, 0), [groups])
@@ -58,6 +62,17 @@ export function CleanupView(): React.JSX.Element {
         </p>
       </div>
 
+      {appDataSkipped && (
+        <p className="view-note">
+          <Icon name="info" size={13} />
+          这次扫描跳过了 AppData，而浏览器缓存、聊天软件缓存大多藏在那里。想清理它们，
+          <button className="link" onClick={openSettings}>
+            去设置里取消勾选 AppData
+          </button>
+          后重新扫描。
+        </p>
+      )}
+
       {groups.length === 0 ? (
         <EmptyState
           icon="sparkle"
@@ -89,7 +104,10 @@ export function CleanupView(): React.JSX.Element {
                     >
                       {open ? '收起' : '看看是哪些'}
                     </button>
-                    <button className="btn danger sm" onClick={() => requestTrash(group.nodes)}>
+                    <button
+                      className="btn danger sm"
+                      onClick={() => requestTrash(group.nodes, group.title, group.id)}
+                    >
                       <Icon name="trash" size={13} /> 清理
                     </button>
                   </div>

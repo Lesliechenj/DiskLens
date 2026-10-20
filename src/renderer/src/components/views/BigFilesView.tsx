@@ -1,4 +1,4 @@
-// 大文件榜单：全盘最大的 300 个文件，可排序、可翻页
+// 大文件榜单：本次扫描最大的 300 个文件，可排序、可翻页
 // 小白最实用的第二屏——"到底是谁把我的盘塞满了"，一眼看到具体文件
 
 import { useMemo, useState } from 'react'
@@ -80,7 +80,7 @@ export function BigFilesView(): React.JSX.Element {
       <div className="view-bar">
         <div className="view-bar-left">
           <span className="view-bar-stat">
-            最大的文件 · 合计 <b>{formatBytes(shownSize)}</b>（占全盘{' '}
+            最大的文件 · 合计 <b>{formatBytes(shownSize)}</b>（占本次扫描{' '}
             <b>{formatPercent(shownSize, total)}%</b>）
           </span>
         </div>
@@ -95,7 +95,7 @@ export function BigFilesView(): React.JSX.Element {
           <button className="th num" onClick={() => toggleSort('size')}>
             大小 {sortMark('size')}
           </button>
-          <span className="th num">占全盘</span>
+          <span className="th num">占本次</span>
           <button className="th" onClick={() => toggleSort('mtime')}>
             修改时间 {sortMark('mtime')}
           </button>
@@ -131,7 +131,10 @@ export function BigFilesView(): React.JSX.Element {
               <span className="td file-name">
                 <span className="rank">{index + 1}</span>
                 <i className="cat-dot" style={{ background: categoryColor(info.category) }} />
-                <span className="ellipsis">{file.name}</span>
+                <span className="file-title">
+                  <span className="ellipsis">{file.name}</span>
+                  <span className="file-sub-path">{file.path}</span>
+                </span>
                 <span className="tag tiny">{info.label}</span>
                 {risk.level !== 'caution' && (
                   <span className={`tag tiny risk-${risk.level}`} title={risk.hint}>

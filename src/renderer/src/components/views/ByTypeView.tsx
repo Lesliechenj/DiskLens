@@ -1,4 +1,4 @@
-// 文件分类视图：选一个类型（.docx / 视频 / 图片…），把扫过的所有盘里这类文件一次列全
+// 文件分类视图：选一个类型（.docx / 视频 / 图片…），把这次扫描范围里这类文件一次列全
 // "把散落在各处的同一类文件揪出来"是清理时最常用的动作
 
 import { useMemo, useState } from 'react'
@@ -102,7 +102,7 @@ export function ByTypeView(): React.JSX.Element {
       <section className="card">
         <header className="card-head">
           <h3>按类型找文件</h3>
-          <span className="card-sub">选一类，把扫过的所有盘里这类文件列全（按大小排）</span>
+          <span className="card-sub">选一类，把这次扫描范围里这类文件列全（按大小排）</span>
         </header>
 
         <div className="type-chips">
@@ -233,7 +233,10 @@ export function ByTypeView(): React.JSX.Element {
                       className="cat-dot"
                       style={{ background: categoryColor(extInfo(file.name).category) }}
                     />
-                    <span className="ellipsis">{file.name}</span>
+                    <span className="file-title">
+                      <span className="ellipsis">{file.name}</span>
+                      <span className="file-sub-path">{file.path}</span>
+                    </span>
                     {risk.level !== 'caution' && (
                       <span className={`tag tiny risk-${risk.level}`} title={risk.hint}>
                         <Icon name={risk.icon} size={11} /> {risk.label}

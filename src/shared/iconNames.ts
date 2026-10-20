@@ -33,6 +33,7 @@ export type IconName =
   | 'check'
   | 'alert'
   | 'info'
+  | 'help'
   | 'eye'
   | 'shield'
   | 'clock'

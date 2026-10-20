@@ -1,4 +1,4 @@
-// 文件夹榜：全盘最大的目录，一眼看出"哪个文件夹是重灾区"
+// 文件夹榜：本次扫描里最大的目录，一眼看出"哪个文件夹是重灾区"
 // 点一行直接下钻到那个目录（面包屑自动铺好），比一格格点色块快得多
 
 import { useMemo, useState } from 'react'
@@ -67,7 +67,7 @@ export function FoldersView(): React.JSX.Element {
           <span className="th">#</span>
           <span className="th">文件夹</span>
           <span className="th num">占用</span>
-          <span className="th num">占全盘</span>
+          <span className="th num">占本次</span>
           <span className="th num">直接文件</span>
           <span className="th num">子目录</span>
           <span className="th">最近改动</span>

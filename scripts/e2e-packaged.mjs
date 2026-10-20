@@ -7,7 +7,8 @@ import { mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
 
 const root = process.cwd()
-const exe = join(root, 'dist', 'win-unpacked', 'disklens.exe')
+// 默认打 dist；release 版可以用 DISKLENS_PACKAGED_EXE 指过去（避免旧 dist 被占用时没法验证）
+const exe = process.env.DISKLENS_PACKAGED_EXE ?? join(root, 'dist', 'win-unpacked', 'disklens.exe')
 const outDir = join(root, '.tmp-smoke', 'packaged')
 const fixture = join(root, '.tmp-e2e-fixture')
 
@@ -84,9 +85,43 @@ async function main() {
   console.log('清理建议（打包模式）:', cleanup >= 1 ? `OK（${cleanup} 组）` : 'FAIL')
   await page.screenshot({ path: join(outDir, 'packaged-cleanup.png') })
 
+  // v2.2 新视图在打包产物里也要能跑（多入口/asar 路径最容易在这里翻车）
+  await page.click('.view-tabs .tab:has-text("目录树")')
+  await page.waitForTimeout(600)
+  const treeRows = await page.locator('.tree-grid.tr').count()
+  console.log('目录树（打包模式）:', treeRows >= 2 ? `OK（${treeRows} 行）` : 'FAIL')
+
+  await page.click('.view-tabs .tab:has-text("文件年龄")')
+  await page.waitForTimeout(600)
+  const ageBars = await page.locator('.age-bar-row').count()
+  console.log('文件年龄（打包模式）:', ageBars === 7 ? 'OK' : 'FAIL')
+
+  await page.click('.view-tabs .tab:has-text("重复文件")')
+  await page.waitForTimeout(500)
+  await page.locator('.dupe-hero-actions .btn.primary').click()
+  const dupeReady = await page
+    .waitForSelector('.dupe-card, .empty-state', { timeout: 60_000 })
+    .then(() => true)
+    .catch(() => false)
+  const dupeGroups = await page.locator('.dupe-card').count()
+  console.log(
+    '重复文件（打包模式）:',
+    dupeReady && dupeGroups >= 1 ? `OK（${dupeGroups} 组）` : 'FAIL'
+  )
+  await page.screenshot({ path: join(outDir, 'packaged-duplicates.png') })
+
   await app.close()
 
-  const ok = info.isPackaged && apiOk && scanned && cleanup >= 1 && errors.length === 0
+  const ok =
+    info.isPackaged &&
+    apiOk &&
+    scanned &&
+    cleanup >= 1 &&
+    treeRows >= 2 &&
+    ageBars === 7 &&
+    dupeReady &&
+    dupeGroups >= 1 &&
+    errors.length === 0
   console.log('渲染层错误:', errors.length, '| 结论:', ok ? '打包产物冒烟通过' : '有问题')
   if (!ok) process.exitCode = 1
 }

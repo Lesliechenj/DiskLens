@@ -170,6 +170,83 @@ export async function scanDirectory(
   const root = await walk(rootPath)
   return {
     root,
+    roots: [rootPath],
+    multi: false,
+    skipped,
+    skippedCount,
+    excluded,
+    durationMs: Date.now() - startedAt,
+    stats: { files, dirs }
+  }
+}
+
+/**
+ * 一次扫多个根路径（比如 C: / D: / E:）。
+ *
+ * 单路径时保持和原来完全一样（root 就是那个目录）；
+ * 多路径时造一个虚拟根「全部磁盘」，每个盘是它的直接子节点——
+ * 面积图/目录树/查重等所有视图都不用改，天然支持多盘。
+ */
+export async function scanPaths(
+  rootPaths: string[],
+  onProgress?: (progress: ScanProgress) => void,
+  options: ScanOptions = {}
+): Promise<ScanResult> {
+  const roots = [...new Set(rootPaths.map((path) => path.trim()).filter(Boolean))]
+  if (roots.length === 0) throw new Error('没有要扫描的路径')
+  if (roots.length === 1) return scanDirectory(roots[0], onProgress, options)
+
+  const startedAt = Date.now()
+  const children: ScanNode[] = []
+  let files = 0
+  let dirs = 0
+  let bytes = 0
+  let skippedCount = 0
+  let excluded = 0
+  const skipped: string[] = []
+
+  for (const rootPath of roots) {
+    if (options.shouldStop?.()) throw new ScanCancelledError()
+    const result = await scanDirectory(
+      rootPath,
+      (progress) => {
+        onProgress?.({
+          files: files + progress.files,
+          dirs: dirs + progress.dirs,
+          bytes: bytes + progress.bytes,
+          currentPath: progress.currentPath,
+          elapsedMs: Date.now() - startedAt
+        })
+      },
+      options
+    )
+    children.push(result.root)
+    files += result.stats.files
+    dirs += result.stats.dirs
+    bytes += result.root.size
+    skippedCount += result.skippedCount
+    excluded += result.excluded
+    for (const item of result.skipped) {
+      if (skipped.length >= SKIPPED_SAMPLE_LIMIT) break
+      skipped.push(item)
+    }
+  }
+
+  const totalSize = children.reduce((sum, child) => sum + child.size, 0)
+  const root: ScanNode = {
+    name: '全部磁盘',
+    // 虚拟根没有真实路径：所有"删除/打开"操作只会在真实子节点上发起
+    path: '',
+    size: totalSize,
+    type: 'dir',
+    mtime: children.reduce((max, child) => Math.max(max, child.mtime), 0),
+    children
+  }
+
+  return {
+    root,
+    roots,
+    multi: true,
     skipped,
     skippedCount,
     excluded,

@@ -61,3 +61,79 @@ export function parentDirOf(path: string): string {
   // Windows 盘符根：C: → C:/
   return /^[a-zA-Z]:$/.test(parent) ? `${parent}/` : parent
 }
+
+/**
+ * 把用户输入拆成多个路径：支持换行、英文分号、竖线。
+ * 例：`C:/  D:/  E:/` 或 `C:/;D:/` 都能一次扫。
+ */
+export function splitUserPaths(raw: string): string[] {
+  return raw
+    .split(/[\r\n;|]+/)
+    .map((item) => item.trim())
+    .filter(Boolean)
+}
+
+/** 多路径输入 → 规范化后的路径数组（去重、保持顺序） */
+export function normalizeUserPaths(raw: string): string[] {
+  const seen = new Set<string>()
+  const paths: string[] = []
+  for (const item of splitUserPaths(raw)) {
+    const normalized = normalizeUserPath(item)
+    if (!normalized) continue
+    const key = normalized.toLowerCase()
+    if (seen.has(key)) continue
+    seen.add(key)
+    paths.push(normalized)
+  }
+  return paths
+}
+
+/** 路径列表 → 一行显示（报告/状态栏用） */
+export function formatPathList(paths: string[], max = 6): string {
+  if (paths.length === 0) return ''
+  if (paths.length <= max) return paths.join(' · ')
+  return `${paths.slice(0, max).join(' · ')} 等 ${paths.length} 个位置`
+}
+
+/** 判断 child 是否就是 parent 或在 parent 里面（大小写/斜杠都不敏感） */
+export function isSameOrInsidePath(child: string, parent: string): boolean {
+  const normalize = (value: string): string =>
+    value.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase()
+  const c = normalize(child)
+  const p = normalize(parent)
+  if (!p) return false
+  return c === p || c.startsWith(`${p}/`)
+}
+
+/** Windows 上这些位置需要管理员权限才能删；其它平台恒为 false */
+const WINDOWS_PROTECTED_ROOTS = [
+  'c:/windows',
+  'c:/program files',
+  'c:/program files (x86)',
+  'c:/programdata',
+  'c:/$recycle.bin',
+  'c:/system volume information',
+  'c:/recovery',
+  'c:/boot',
+  'c:/efi',
+  'c:/perflogs',
+  'c:/config.msi',
+  'c:/documents and settings',
+  'c:/windows.old'
+]
+
+/** 这个路径是否属于"普通权限删不动，需要管理员"的位置 */
+export function isProtectedPath(path: string): boolean {
+  const normalized = path.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase()
+  if (!/^[a-z]:\//.test(normalized)) return false
+  // 盘符根（C:/）本身也不能当普通文件删
+  if (/^[a-z]:$/.test(normalized)) return true
+  return WINDOWS_PROTECTED_ROOTS.some(
+    (root) => normalized === root || normalized.startsWith(`${root}/`)
+  )
+}
+
+/** 这批路径里是否至少有一个需要管理员权限 */
+export function needsAdminForPaths(paths: string[]): boolean {
+  return paths.some((path) => isProtectedPath(path))
+}

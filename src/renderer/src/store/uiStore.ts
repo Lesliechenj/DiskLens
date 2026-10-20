@@ -2,7 +2,7 @@
 // 与"数据"无关，放这里免得污染扫描/设置两个 store
 
 import { create } from 'zustand'
-import type { ScanNode, TrashProgress } from '../../../shared/types'
+import type { CleanupReport, ScanNode, TrashProgress } from '../../../shared/types'
 
 export type ToastKind = 'ok' | 'err' | 'info'
 
@@ -22,6 +22,10 @@ interface UiState {
   aboutOpen: boolean
   openAbout: () => void
   closeAbout: () => void
+  /** 新手帮助（F1） */
+  helpOpen: boolean
+  openHelp: () => void
+  closeHelp: () => void
   /** 被跳过的路径清单弹窗（无权限等） */
   skippedOpen: boolean
   openSkipped: () => void
@@ -34,11 +38,22 @@ interface UiState {
   toggleSidebar: (open?: boolean) => void
   /** 待确认删除的节点（统一走一个确认弹窗，别处只管发起） */
   trashTargets: ScanNode[] | null
-  requestTrash: (nodes: ScanNode[]) => void
+  /** 这批清理来自哪个建议分组（写进报告） */
+  trashLabel: string
+  trashGroupId: string
+  requestTrash: (nodes: ScanNode[], label?: string, groupId?: string) => void
   clearTrash: () => void
   /** 批量移到回收站的实时进度（null = 没有进行中的操作） */
   trashProgress: TrashProgress | null
   setTrashProgress: (progress: TrashProgress | null) => void
+  /** 每次清理后的报告弹窗 */
+  cleanupReport: CleanupReport | null
+  setCleanupReport: (report: CleanupReport | null) => void
+  closeCleanupReport: () => void
+  /** 新手「一键清理」向导 */
+  wizardOpen: boolean
+  openWizard: () => void
+  closeWizard: () => void
 }
 
 let toastSeq = 0
@@ -61,6 +76,9 @@ export const useUiStore = create<UiState>((set, get) => ({
   aboutOpen: false,
   openAbout: () => set({ aboutOpen: true }),
   closeAbout: () => set({ aboutOpen: false }),
+  helpOpen: false,
+  openHelp: () => set({ helpOpen: true }),
+  closeHelp: () => set({ helpOpen: false }),
   skippedOpen: false,
   openSkipped: () => set({ skippedOpen: true }),
   closeSkipped: () => set({ skippedOpen: false }),
@@ -69,7 +87,9 @@ export const useUiStore = create<UiState>((set, get) => ({
   sidebarOpen: true,
   toggleSidebar: (open) => set((state) => ({ sidebarOpen: open ?? !state.sidebarOpen })),
   trashTargets: null,
-  requestTrash: (nodes) =>
+  trashLabel: '',
+  trashGroupId: '',
+  requestTrash: (nodes, label = '', groupId = '') =>
     set((state) => {
       if (!nodes || nodes.length === 0) return { trashTargets: null }
       // 已经有确认弹窗开着就排队追加，不吞掉用户的第二次请求
@@ -80,11 +100,17 @@ export const useUiStore = create<UiState>((set, get) => ({
         }
         return { trashTargets: merged }
       }
-      return { trashTargets: nodes }
+      return { trashTargets: nodes, trashLabel: label, trashGroupId: groupId }
     }),
-  clearTrash: () => set({ trashTargets: null }),
+  clearTrash: () => set({ trashTargets: null, trashLabel: '', trashGroupId: '' }),
   trashProgress: null,
-  setTrashProgress: (progress) => set({ trashProgress: progress })
+  setTrashProgress: (progress) => set({ trashProgress: progress }),
+  cleanupReport: null,
+  setCleanupReport: (report) => set({ cleanupReport: report }),
+  closeCleanupReport: () => set({ cleanupReport: null }),
+  wizardOpen: false,
+  openWizard: () => set({ wizardOpen: true }),
+  closeWizard: () => set({ wizardOpen: false })
 }))
 
 /** 便捷调用：组件里一行拿到 toast 方法 */

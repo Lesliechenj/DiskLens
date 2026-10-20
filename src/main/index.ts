@@ -5,7 +5,9 @@ import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import type {
   AppSettings,
+  CleanupExecuteRequest,
   DriveInfo,
+  DuplicateCandidateGroup,
   ExportPayload,
   ScanProgress,
   ScanResult,
@@ -26,6 +28,16 @@ import {
 } from './recycleBin'
 import { currentSettings, flushSettings, loadSettings, updateSettings } from './settings'
 import { exportReport } from './report'
+import { DuplicateCancelledError, findDuplicateFiles } from './duplicates'
+import { executeCleanup } from './cleanup'
+import { inspectZip } from './archives'
+import { scanJunk } from './junk'
+import {
+  deleteLatestSnapshot,
+  getLatestSnapshot,
+  loadLatestSnapshot,
+  saveSnapshot
+} from './snapshots'
 
 // 关闭硬件加速：部分老旧机器/虚拟机/远程桌面环境下 GPU 进程会直接崩溃
 // 导致整个应用闪退（FATAL: GPU process isn't usable）。
@@ -85,9 +97,13 @@ let mainWindow: BrowserWindow | null = null
 let scannerWindow: BrowserWindow | null = null
 /** 扫描进程是否已经加载完（早于加载完成的扫描请求先排队） */
 let scannerReady = false
-let pendingScan: { rootPath: string; excludeNames: string[] } | null = null
+let pendingScan: { rootPaths: string[]; excludeNames: string[] } | null = null
 /** 同一时间只允许一个扫描任务 */
 let scanning = false
+/** 正在跑的查重任务（null = 没有）；取消时把 cancelled 置 true */
+let duplicateJob: { cancelled: boolean } | null = null
+/** 正在跑的系统垃圾扫描 */
+let junkJob: { cancelled: boolean } | null = null
 
 function isDarkTheme(theme: AppSettings['theme']): boolean {
   if (theme === 'system') return nativeTheme.shouldUseDarkColors
@@ -208,7 +224,7 @@ function createScannerWindow(): void {
     if (pendingScan) {
       const job = pendingScan
       pendingScan = null
-      scannerWindow?.webContents.send('scan:run', job.rootPath, job.excludeNames)
+      scannerWindow?.webContents.send('scan:run', job.rootPaths, job.excludeNames)
     }
   })
   scannerWindow.on('closed', () => {
@@ -218,15 +234,15 @@ function createScannerWindow(): void {
   void scannerWindow.loadFile(join(__dirname, '../renderer/scanner/index.html'))
 }
 
-/** 把扫描任务交给扫描进程（没加载完就先排队） */
-function dispatchScan(rootPath: string, excludeNames: string[]): void {
+/** 把扫描任务交给扫描进程（没加载完就先排队）；支持一次多个根路径 */
+function dispatchScan(rootPaths: string[], excludeNames: string[]): void {
   if (!scannerWindow || scannerWindow.isDestroyed()) {
     createScannerWindow()
   }
   if (scannerReady && scannerWindow) {
-    scannerWindow.webContents.send('scan:run', rootPath, excludeNames)
+    scannerWindow.webContents.send('scan:run', rootPaths, excludeNames)
   } else {
-    pendingScan = { rootPath, excludeNames }
+    pendingScan = { rootPaths, excludeNames }
   }
 }
 
@@ -381,19 +397,61 @@ if (!gotLock) {
         }
       })
 
-      // ---- 扫描 ----
-      ipcMain.handle('scan:start', (_event, rootPath: string, excludeNames: string[] = []) => {
-        if (scanning) return { ok: false, message: '已经有一次扫描在跑了，先等它结束或取消' }
-        scanning = true
-        const settings = updateSettings({
-          lastPath: rootPath,
-          recentPaths: pushRecentPath(currentSettings().recentPaths, rootPath)
-        })
-        dispatchScan(rootPath, Array.isArray(excludeNames) ? excludeNames : [])
-        return { ok: true, recentPaths: settings.recentPaths }
-      })
+      // ---- 扫描（单路径 / 多盘一起扫） ----
+      ipcMain.handle(
+        'scan:start',
+        (_event, input: string | string[], excludeNames: string[] = []) => {
+          if (scanning) return { ok: false, message: '已经有一次扫描在跑了，先等它结束或取消' }
+          const rootPaths = (Array.isArray(input) ? input : [input])
+            .map((path) => (typeof path === 'string' ? path.trim() : ''))
+            .filter(Boolean)
+          if (rootPaths.length === 0) return { ok: false, message: '没有要扫描的路径' }
+          scanning = true
+          const lastPath = rootPaths.join('; ')
+          const settings = updateSettings({
+            lastPath,
+            recentPaths:
+              rootPaths.length === 1
+                ? pushRecentPath(currentSettings().recentPaths, rootPaths[0])
+                : currentSettings().recentPaths
+          })
+          dispatchScan(rootPaths, Array.isArray(excludeNames) ? excludeNames : [])
+          return { ok: true, recentPaths: settings.recentPaths }
+        }
+      )
       ipcMain.on('scan:cancel', () => {
         scannerWindow?.webContents.send('scan:cancel')
+      })
+
+      // ---- 系统垃圾扫描（只扫已知临时/缓存目录，供新手向导一键清理） ----
+      ipcMain.handle('junk:scan', async (event) => {
+        if (scanning) return { ok: false, message: '整盘扫描正在进行，等它结束再试' }
+        if (junkJob) return { ok: false, message: '垃圾扫描正在进行' }
+        const job = { cancelled: false }
+        junkJob = job
+        try {
+          let lastSentAt = 0
+          const result = await scanJunk(
+            (progress) => {
+              const now = Date.now()
+              if (now - lastSentAt < 150) return
+              lastSentAt = now
+              if (!event.sender.isDestroyed()) event.sender.send('junk:progress', progress)
+            },
+            () => job.cancelled
+          )
+          return result
+        } catch (error) {
+          return {
+            ok: false,
+            message: error instanceof Error ? error.message : String(error)
+          }
+        } finally {
+          if (junkJob === job) junkJob = null
+        }
+      })
+      ipcMain.on('junk:cancel', () => {
+        if (junkJob) junkJob.cancelled = true
       })
 
       // 扫描进程 → 主进程 → 渲染层
@@ -403,6 +461,14 @@ if (!gotLock) {
       ipcMain.on('scan:done', (_event, result: ScanResult) => {
         scanning = false
         sendToMain('scan:done', result)
+        // 自动存最后一份快照：下次打开可以直接恢复，不必重扫
+        if (currentSettings().autoSnapshot) {
+          void saveSnapshot(result)
+            .then((meta) => {
+              if (meta) sendToMain('snapshot:saved', meta)
+            })
+            .catch(() => undefined)
+        }
       })
       ipcMain.on('scan:error', (_event, message: string) => {
         scanning = false
@@ -440,6 +506,25 @@ if (!gotLock) {
         })
       })
 
+      // ---- 一次性授权清理 + 自动生成详细报告 ----
+      ipcMain.handle('cleanup:execute', async (event, request: CleanupExecuteRequest) => {
+        const result = await executeCleanup(request, currentSettings(), (done, total, current) => {
+          if (!event.sender.isDestroyed()) {
+            const payload: TrashProgress = { done, total, current }
+            event.sender.send('trash:progress', payload)
+          }
+        })
+        return result
+      })
+
+      // ---- 扫描快照（上次结果直接恢复，不用重扫） ----
+      ipcMain.handle('snapshot:latest', () => getLatestSnapshot())
+      ipcMain.handle('snapshot:load', () => loadLatestSnapshot())
+      ipcMain.handle('snapshot:delete', async () => {
+        await deleteLatestSnapshot()
+        return { ok: true }
+      })
+
       // ---- 回收站（独立查看自己删了哪些东西） ----
       ipcMain.handle('trash:list', async () => {
         const drives = await listDrives()
@@ -467,6 +552,55 @@ if (!gotLock) {
         } catch (error) {
           return { ok: false, message: error instanceof Error ? error.message : String(error) }
         }
+      })
+
+      // ---- 重复文件检测 ----
+      // 渲染层已经把"同大小、至少两份"的文件分好组；主进程只负责读内容比对。
+      // 只读不写：查重永远不碰文件，删除仍然要走回收站 + 二次确认。
+      ipcMain.handle('dupes:start', async (event, candidates: DuplicateCandidateGroup[]) => {
+        if (duplicateJob) {
+          return { ok: false, message: '已经有一次查重在跑了，先等它结束或取消' }
+        }
+        const job = { cancelled: false }
+        duplicateJob = job
+        try {
+          const result = await findDuplicateFiles(
+            Array.isArray(candidates) ? candidates : [],
+            (progress) => {
+              if (!event.sender.isDestroyed()) event.sender.send('dupes:progress', progress)
+            },
+            () => job.cancelled
+          )
+          return { ok: true, result }
+        } catch (error) {
+          if (error instanceof DuplicateCancelledError || job.cancelled) {
+            return { ok: false, cancelled: true }
+          }
+          return {
+            ok: false,
+            message: error instanceof Error ? error.message : String(error)
+          }
+        } finally {
+          if (duplicateJob === job) duplicateJob = null
+        }
+      })
+      ipcMain.on('dupes:cancel', () => {
+        if (duplicateJob) duplicateJob.cancelled = true
+      })
+
+      // ---- 压缩包内容查看（内置 ZIP 解析） ----
+      ipcMain.handle('archive:inspect', (_event, path: string) => {
+        if (typeof path !== 'string' || !path.trim()) {
+          return {
+            path: '',
+            entries: [],
+            totalSize: 0,
+            unpackedBytes: 0,
+            truncated: false,
+            error: '文件路径是空的'
+          }
+        }
+        return inspectZip(path)
       })
 
       // ---- 文件预览 ----

@@ -78,6 +78,7 @@ export function DetailsPanel(): React.JSX.Element | null {
   const parentSize = parent?.size ?? totalSize
   const risk = riskOf(selected)
   const isDir = selected.type === 'dir'
+  const isVirtualRoot = !selected.path.trim()
   const info = isDir ? null : extInfo(selected.name)
   const category = categoryOfNode(selected)
   const activePreview = preview && preview.path === selected.path ? preview.data : null
@@ -143,7 +144,7 @@ export function DetailsPanel(): React.JSX.Element | null {
           <dd>{formatPercent(selected.size, parentSize)}%</dd>
         </div>
         <div>
-          <dt>占全盘</dt>
+          <dt>占扫描范围</dt>
           <dd>{formatPercent(selected.size, totalSize)}%</dd>
         </div>
         <div>
@@ -205,52 +206,61 @@ export function DetailsPanel(): React.JSX.Element | null {
         </div>
       )}
 
-      <div className="details-path" title={selected.path}>
-        <span>{selected.path}</span>
-        <button
-          className="icon-btn xs"
-          onClick={() => void copyText(selected.path)}
-          title="复制完整路径"
-        >
-          <Icon name="copy" size={12} />
-        </button>
-      </div>
+      {isVirtualRoot ? (
+        <p className="details-foot">
+          <Icon name="info" size={12} />
+          这是多盘扫描的汇总层，没有对应的磁盘路径。请从目录树/图表里选择具体磁盘或文件夹。
+        </p>
+      ) : (
+        <>
+          <div className="details-path" title={selected.path}>
+            <span>{selected.path}</span>
+            <button
+              className="icon-btn xs"
+              onClick={() => void copyText(selected.path)}
+              title="复制完整路径"
+            >
+              <Icon name="copy" size={12} />
+            </button>
+          </div>
 
-      <div className="details-actions">
-        <button className="btn sm" onClick={() => void locatePath(selected.path)}>
-          <Icon name="locate" size={13} /> 定位
-        </button>
-        <button
-          className="btn sm"
-          onClick={() => void openPath(selected.path)}
-          title={isDir ? '用资源管理器打开' : '用默认程序打开'}
-        >
-          <Icon name="external" size={13} /> 打开
-        </button>
-        {isDir ? (
-          <button className="btn sm" onClick={enterDir}>
-            <Icon name="chevronRight" size={13} /> 进入
-          </button>
-        ) : (
-          <button
-            className="btn sm"
-            onClick={onlyThisType}
-            title="回到上一层的面积图，只显示这类文件"
-          >
-            <Icon name="search" size={13} /> 只看这类
-          </button>
-        )}
-        <button className="btn danger sm full" onClick={() => requestTrash([selected])}>
-          <Icon name="trash" size={13} /> 移到回收站
-        </button>
-      </div>
+          <div className="details-actions">
+            <button className="btn sm" onClick={() => void locatePath(selected.path)}>
+              <Icon name="locate" size={13} /> 定位
+            </button>
+            <button
+              className="btn sm"
+              onClick={() => void openPath(selected.path)}
+              title={isDir ? '用资源管理器打开' : '用默认程序打开'}
+            >
+              <Icon name="external" size={13} /> 打开
+            </button>
+            {isDir ? (
+              <button className="btn sm" onClick={enterDir}>
+                <Icon name="chevronRight" size={13} /> 进入
+              </button>
+            ) : (
+              <button
+                className="btn sm"
+                onClick={onlyThisType}
+                title="回到上一层的面积图，只显示这类文件"
+              >
+                <Icon name="search" size={13} /> 只看这类
+              </button>
+            )}
+            <button className="btn danger sm full" onClick={() => requestTrash([selected])}>
+              <Icon name="trash" size={13} /> 移到回收站
+            </button>
+          </div>
 
-      <p className="details-foot">
-        <Icon name="shield" size={12} />
-        {risk.level === RISK.danger.level
-          ? '这类文件删了可能让软件/系统出问题，建议用卸载程序'
-          : '删除只进回收站，随时能恢复'}
-      </p>
+          <p className="details-foot">
+            <Icon name="shield" size={12} />
+            {risk.level === RISK.danger.level
+              ? '这类文件删了可能让软件/系统出问题，建议用卸载程序'
+              : '删除只进回收站，随时能恢复'}
+          </p>
+        </>
+      )}
     </aside>
   )
 }

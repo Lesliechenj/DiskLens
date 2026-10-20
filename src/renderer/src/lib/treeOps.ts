@@ -3,22 +3,41 @@
 
 import type { ScanNode } from '../../../shared/types'
 
+/** 数一棵子树里的文件/目录数量（删除后同步状态栏统计用） */
+function countSubtree(node: ScanNode): { files: number; dirs: number } {
+  if (node.type === 'file') return { files: 1, dirs: 0 }
+  let files = 0
+  let dirs = 1
+  const stack: ScanNode[] = [...(node.children ?? [])]
+  while (stack.length > 0) {
+    const item = stack.pop()!
+    if (item.type === 'file') files++
+    else {
+      dirs++
+      for (const kid of item.children ?? []) stack.push(kid)
+    }
+  }
+  return { files, dirs }
+}
+
 /**
  * 批量按路径从树中摘除节点，并沿祖先链扣减大小与文件计数。
  * 一次遍历解决，避免"删 200 个文件就遍历 200 遍整棵树"。
  *
- * @returns 实际摘除的节点数与被释放的字节数（图表/状态栏据此刷新）
+ * @returns 实际摘除的节点数、文件/目录数与被释放的字节数（图表/状态栏据此刷新）
  */
 export function removeNodes(
   root: ScanNode,
   targetPaths: Iterable<string>
-): { removed: number; freedBytes: number } {
+): { removed: number; freedBytes: number; removedFiles: number; removedDirs: number } {
   const targets = new Set(targetPaths)
-  if (targets.size === 0) return { removed: 0, freedBytes: 0 }
-  if (targets.has(root.path)) return { removed: 0, freedBytes: 0 }
+  if (targets.size === 0) return { removed: 0, freedBytes: 0, removedFiles: 0, removedDirs: 0 }
+  if (targets.has(root.path)) return { removed: 0, freedBytes: 0, removedFiles: 0, removedDirs: 0 }
 
   let removed = 0
   let freedBytes = 0
+  let removedFiles = 0
+  let removedDirs = 0
 
   /** 后序遍历：先处理孩子，再决定自己要不要留（孩子被摘掉后 size 已经更新） */
   const stack: { node: ScanNode; visited: boolean }[] = [{ node: root, visited: false }]
@@ -37,8 +56,12 @@ export function removeNodes(
     const kept: ScanNode[] = []
     for (const kid of node.children) {
       if (targets.has(kid.path)) {
-        // 直接命中：整棵摘掉，扣它现在的 size
+        // 直接命中：整棵摘掉，扣它现在的 size；文件/目录数也一起减，
+        // 否则状态栏会一直显示删除前的数量（v2.1 的小 bug）
+        const counts = countSubtree(kid)
         removed++
+        removedFiles += counts.files
+        removedDirs += counts.dirs
         freedBytes += kid.size
         delta += kid.size
       } else {
@@ -51,7 +74,7 @@ export function removeNodes(
     }
   }
 
-  return { removed, freedBytes }
+  return { removed, freedBytes, removedFiles, removedDirs }
 }
 
 /** 单个节点摘除（保留旧语义，内部走批量实现） */

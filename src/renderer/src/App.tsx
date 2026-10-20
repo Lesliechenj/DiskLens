@@ -4,6 +4,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useScanStore } from './store/scanStore'
 import { useSettingsStore } from './store/settingsStore'
+import { useDuplicateStore } from './store/duplicateStore'
 import { useUiStore, toast } from './store/uiStore'
 import { useStartScan } from './hooks/useStartScan'
 import { TitleBar } from './components/TitleBar'
@@ -16,54 +17,79 @@ import { WelcomeScreen } from './components/WelcomeScreen'
 import { ScanningPanel } from './components/ScanningPanel'
 import { SettingsDialog } from './components/SettingsDialog'
 import { AboutDialog } from './components/AboutDialog'
+import { HelpDialog } from './components/HelpDialog'
 import { SkippedDialog } from './components/SkippedDialog'
 import { TrashConfirm } from './components/TrashConfirm'
+import { CleanupReportDialog } from './components/CleanupReportDialog'
+import { CleanupWizard } from './components/CleanupWizard'
+import { GuideBar } from './components/GuideBar'
 import { ToastHost } from './components/ui/ToastHost'
 import { TreemapView } from './components/views/TreemapView'
 import { SunburstView } from './components/views/SunburstView'
+import { TreeView } from './components/views/TreeView'
 import { TypesView } from './components/views/TypesView'
 import { ByTypeView } from './components/views/ByTypeView'
 import { BigFilesView } from './components/views/BigFilesView'
 import { FoldersView } from './components/views/FoldersView'
+import { AgeView } from './components/views/AgeView'
+import { DuplicateView } from './components/views/DuplicateView'
+import { ArchivesView } from './components/views/ArchivesView'
 import { CleanupView } from './components/views/CleanupView'
 import { TrashView } from './components/views/TrashView'
 import { TrashProgressBar } from './components/TrashProgress'
 import { Icon } from './components/icons'
 import { exportReport } from './lib/exportReport'
 import { formatBytes } from '../../shared/format'
-import { parentDirOf } from '../../shared/paths'
+import { parentDirOf, splitUserPaths } from '../../shared/paths'
 
 function App(): React.JSX.Element {
   const init = useSettingsStore((state) => state.init)
   const dark = useSettingsStore((state) => state.dark)
   const rememberPath = useSettingsStore((state) => state.settings.rememberPath)
   const lastPath = useSettingsStore((state) => state.settings.lastPath)
+  const beginnerMode = useSettingsStore((state) => state.settings.beginnerMode)
   const sidebarOpen = useUiStore((state) => state.sidebarOpen)
   const detailsOpen = useUiStore((state) => state.detailsOpen)
+  const wizardOpen = useUiStore((state) => state.wizardOpen)
   const status = useScanStore((state) => state.status)
   const result = useScanStore((state) => state.result)
   const view = useScanStore((state) => state.view)
+  const scanId = useScanStore((state) => state.scanId)
   const selected = useScanStore((state) => state.selected)
   const startScan = useStartScan()
   const [dragging, setDragging] = useState(false)
 
-  // 主题落到 <html data-theme>：CSS 变量全套跟着换
+  // 主题 + 新手模式落到 <html>：CSS 变量和字号一起切
   useEffect(() => {
     const root = document.documentElement
     root.dataset.theme = dark ? 'dark' : 'light'
+    root.dataset.beginner = beginnerMode ? 'true' : 'false'
     root.style.colorScheme = dark ? 'dark' : 'light'
-  }, [dark])
+  }, [dark, beginnerMode])
 
-  // 一次性初始化：读设置 + 读磁盘容量
+  // 一次性初始化：读设置 + 磁盘容量 + 上次扫描快照
+  // 新手向导不自动弹（会挡住用户操作）；欢迎页和顶部引导条都有明显入口
   useEffect(() => {
-    void init()
+    let cancelled = false
+    void (async () => {
+      await init()
+      if (cancelled) return
+      const meta = await window.api.getLatestSnapshot().catch(() => null)
+      if (cancelled) return
+      useScanStore.getState().setSnapshotMeta(meta)
+    })()
+    return () => {
+      cancelled = true
+    }
   }, [init])
 
-  // 窗口标题跟着当前扫描的根目录走（任务栏里也能看出在看哪个盘）
-  const rootPath = useScanStore((state) => state.result?.root.path)
+  // 窗口标题跟着当前扫描的根目录走（多盘时显示"全部磁盘"）
+  const resultRoots = useScanStore((state) => state.result?.roots)
   useEffect(() => {
-    document.title = rootPath ? `DiskLens — ${rootPath}` : 'DiskLens'
-  }, [rootPath])
+    const title =
+      resultRoots && resultRoots.length > 0 ? `DiskLens — ${resultRoots.join(' · ')}` : 'DiskLens'
+    document.title = title
+  }, [resultRoots])
 
   // 扫描进程 → 主进程 → 这里
   useEffect(() => {
@@ -94,12 +120,21 @@ function App(): React.JSX.Element {
     const offTrashProgress = window.api.onTrashProgress((progress) => {
       useUiStore.getState().setTrashProgress(progress)
     })
+    // 查重进度 → 查重视图（结果跨视图保留，所以订阅放在 App 层）
+    const offDuplicateProgress = window.api.onDuplicateProgress((progress) => {
+      useDuplicateStore.getState().setProgress(progress)
+    })
+    const offSnapshot = window.api.onSnapshotSaved((meta) => {
+      useScanStore.getState().setSnapshotMeta(meta)
+    })
     return () => {
       offProgress()
       offDone()
       offError()
       offCancelled()
       offTrashProgress()
+      offDuplicateProgress()
+      offSnapshot()
     }
   }, [])
 
@@ -119,11 +154,20 @@ function App(): React.JSX.Element {
       const mod = event.ctrlKey || event.metaKey
 
       if (event.key === 'Escape') {
-        if (ui.trashTargets) ui.clearTrash()
+        if (ui.cleanupReport) ui.closeCleanupReport()
+        else if (ui.wizardOpen) ui.closeWizard()
+        else if (ui.trashTargets) ui.clearTrash()
         else if (ui.skippedOpen) ui.closeSkipped()
         else if (ui.settingsOpen) ui.closeSettings()
         else if (ui.aboutOpen) ui.closeAbout()
+        else if (ui.helpOpen) ui.closeHelp()
         else if (scan.selected) scan.select(null)
+        return
+      }
+
+      if (event.key === 'F1') {
+        event.preventDefault()
+        ui.openHelp()
         return
       }
 
@@ -151,9 +195,13 @@ function App(): React.JSX.Element {
       }
       if (event.key === 'F5') {
         event.preventDefault()
-        const target =
-          scan.breadcrumb.length > 0 ? scan.breadcrumb[0].path : rememberPath ? lastPath : ''
-        if (target) void startScan(target)
+        const roots =
+          scan.result?.roots && scan.result.roots.length > 0
+            ? scan.result.roots
+            : rememberPath
+              ? splitUserPaths(lastPath)
+              : []
+        if (roots.length > 0) void startScan(roots)
         else toast('info', '还没有扫过东西，先选一个磁盘或文件夹')
         return
       }
@@ -222,6 +270,9 @@ function App(): React.JSX.Element {
     switch (view) {
       case 'sunburst':
         return <SunburstView />
+      case 'tree':
+        // key：换一轮扫描就重挂载，目录树回到"根展开"的初始状态
+        return <TreeView key={scanId} />
       case 'types':
         return <TypesView />
       case 'bytype':
@@ -230,13 +281,19 @@ function App(): React.JSX.Element {
         return <BigFilesView />
       case 'folders':
         return <FoldersView />
+      case 'age':
+        return <AgeView />
+      case 'duplicates':
+        return <DuplicateView />
+      case 'archives':
+        return <ArchivesView />
       case 'cleanup':
         return <CleanupView />
       case 'treemap':
       default:
         return <TreemapView />
     }
-  }, [status, result, view])
+  }, [status, result, view, scanId])
 
   return (
     <div
@@ -247,6 +304,7 @@ function App(): React.JSX.Element {
         {sidebarOpen && <Sidebar />}
         <main className="workspace">
           <ScanBar />
+          <GuideBar />
           {(result || view === 'trash') && <Toolbar />}
           <div className="workspace-main">
             <section className="canvas">{content}</section>
@@ -258,8 +316,11 @@ function App(): React.JSX.Element {
       <ToastHost />
       <SettingsDialog />
       <AboutDialog />
+      <HelpDialog />
       <SkippedDialog />
       <TrashConfirm />
+      <CleanupReportDialog />
+      {wizardOpen && <CleanupWizard />}
       <TrashProgressBar />
       {dragging && (
         <div className="drop-overlay">

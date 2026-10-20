@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import { ScanCancelledError, scanDirectory } from './scan'
+import { ScanCancelledError, scanPaths } from './scan'
 import type { ScanProgress, ScanResult } from '../shared/types'
 
 /**
@@ -43,32 +43,37 @@ ipcRenderer.on('scan:cancel', () => {
 })
 
 // 监听主进程下发的扫描指令，执行扫描并回传进度/结果
-ipcRenderer.on('scan:run', async (_event, rootPath: string, excludeNames: string[] = []) => {
-  cancelRequested = false
-  let lastSentAt = 0
-  try {
-    const result = await scanDirectory(
-      rootPath,
-      (progress) => {
-        const now = Date.now()
-        if (now - lastSentAt >= PROGRESS_INTERVAL_MS) {
-          lastSentAt = now
-          scanBridge.sendProgress({ ...progress })
-        }
-      },
-      { excludeNames, shouldStop: () => cancelRequested }
-    )
-    // 取消发生在最后一个目录之后也算取消：结果不完整，不能当成功交付
-    if (cancelRequested) {
-      scanBridge.sendCancelled()
-      return
+// rootPaths 兼容旧的单路径字符串；新版本传数组（多盘一起扫）
+ipcRenderer.on(
+  'scan:run',
+  async (_event, input: string | string[], excludeNames: string[] = []) => {
+    const rootPaths = Array.isArray(input) ? input : [input]
+    cancelRequested = false
+    let lastSentAt = 0
+    try {
+      const result = await scanPaths(
+        rootPaths,
+        (progress) => {
+          const now = Date.now()
+          if (now - lastSentAt >= PROGRESS_INTERVAL_MS) {
+            lastSentAt = now
+            scanBridge.sendProgress({ ...progress })
+          }
+        },
+        { excludeNames, shouldStop: () => cancelRequested }
+      )
+      // 取消发生在最后一个目录之后也算取消：结果不完整，不能当成功交付
+      if (cancelRequested) {
+        scanBridge.sendCancelled()
+        return
+      }
+      scanBridge.sendDone(result)
+    } catch (error) {
+      if (error instanceof ScanCancelledError || cancelRequested) {
+        scanBridge.sendCancelled()
+        return
+      }
+      scanBridge.sendError(error instanceof Error ? error.message : String(error))
     }
-    scanBridge.sendDone(result)
-  } catch (error) {
-    if (error instanceof ScanCancelledError || cancelRequested) {
-      scanBridge.sendCancelled()
-      return
-    }
-    scanBridge.sendError(error instanceof Error ? error.message : String(error))
   }
-})
+)

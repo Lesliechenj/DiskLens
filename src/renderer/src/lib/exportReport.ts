@@ -23,7 +23,7 @@ export async function exportReport(): Promise<string | null> {
     const rows: string[][] = []
 
     // —— 概要 ——
-    rows.push(['扫描路径', result.root.path, '', ''])
+    rows.push(['扫描路径', result.roots.join(' · ') || result.root.path, '', ''])
     rows.push(['总占用', formatBytes(result.root.size), String(result.root.size), '字节'])
     rows.push(['文件总数', String(result.stats.files), '', '个'])
     rows.push(['目录总数', String(result.stats.dirs), '', '个'])
@@ -46,7 +46,7 @@ export async function exportReport(): Promise<string | null> {
     rows.push(['', '', '', ''])
 
     // —— 大文件清单（Top 300）——
-    rows.push(['大文件清单', '大小', '占全盘%', '修改时间', '风险', '文件类型', '路径'])
+    rows.push(['大文件清单', '大小', '占本次扫描%', '修改时间', '风险', '文件类型', '路径'])
     for (const file of insights.largestFiles) {
       const risk = riskOf(file)
       rows.push([
@@ -61,7 +61,7 @@ export async function exportReport(): Promise<string | null> {
     }
 
     const savedPath = await window.api.exportReport({
-      fileName: `DiskLens-${baseNameOf(result.root.path) || '扫描'}-${stamp}`,
+      fileName: `DiskLens-${result.multi ? '全部磁盘' : baseNameOf(result.root.path) || '扫描'}-${stamp}`,
       header: ['DiskLens 扫描报告', '大小', '数值', '备注'],
       rows
     })

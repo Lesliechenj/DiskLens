@@ -205,10 +205,12 @@ async function main() {
   await page.screenshot({ path: join(outDir, 'a3-treemap-drill.png') })
 
   for (const [tab, label] of [
+    ['目录树', '目录树'],
     ['旭日图', '旭日图'],
     ['类型构成', '类型构成'],
     ['大文件', '大文件'],
     ['文件夹', '文件夹'],
+    ['文件年龄', '文件年龄'],
     ['清理建议', '清理建议']
   ]) {
     await page.click(`.view-tabs .tab:has-text("${tab}")`)
@@ -216,6 +218,17 @@ async function main() {
     await auditPage(page, label)
     await page.screenshot({ path: join(outDir, `a4-${encodeURIComponent(tab)}.png`) })
   }
+
+  // 查重视图：先审计"未开始"状态，再真跑一遍审计结果卡片
+  await page.click('.view-tabs .tab:has-text("重复文件")')
+  await page.waitForTimeout(700)
+  await auditPage(page, '重复文件（未开始）')
+  await page.screenshot({ path: join(outDir, 'a4-duplicates-idle.png') })
+  await page.locator('.dupe-hero-actions .btn.primary').click()
+  await page.waitForSelector('.dupe-card, .empty-state', { timeout: 60_000 }).catch(() => undefined)
+  await page.waitForTimeout(600)
+  await auditPage(page, '重复文件（结果）')
+  await page.screenshot({ path: join(outDir, 'a4-duplicates.png') })
 
   // 选中一行 → 详情面板
   await page.click('.view-tabs .tab:has-text("大文件")')

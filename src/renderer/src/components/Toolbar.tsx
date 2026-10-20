@@ -21,6 +21,7 @@ interface ViewTab {
 
 const VIEW_TABS: ViewTab[] = [
   { key: 'treemap', label: '面积图', icon: 'grid', hint: '块越大占地方越多，点目录块下钻' },
+  { key: 'tree', label: '目录树', icon: 'tree', hint: '像资源管理器一样逐层展开，带大小与占比' },
   { key: 'sunburst', label: '旭日图', icon: 'radar', hint: '两层结构一眼看穿，点目录块下钻' },
   { key: 'types', label: '类型构成', icon: 'pie', hint: '哪类文件最占地方' },
   {
@@ -29,8 +30,21 @@ const VIEW_TABS: ViewTab[] = [
     icon: 'tags',
     hint: '按类型列出所有文件：所有 .docx / 所有视频……'
   },
-  { key: 'bigfiles', label: '大文件', icon: 'list', hint: '全盘最大的文件排行' },
+  { key: 'bigfiles', label: '大文件', icon: 'list', hint: '本次扫描最大的文件排行' },
   { key: 'folders', label: '文件夹', icon: 'tree', hint: '最占地方的目录排行' },
+  { key: 'age', label: '文件年龄', icon: 'clock', hint: '哪些文件很久没动过、有多大' },
+  {
+    key: 'duplicates',
+    label: '重复文件',
+    icon: 'copy',
+    hint: '找出内容完全相同的文件，每组保留一份'
+  },
+  {
+    key: 'archives',
+    label: '压缩包',
+    icon: 'archive',
+    hint: 'zip/rar/7z/iso 占了多少，ZIP 可看内容'
+  },
   { key: 'cleanup', label: '清理建议', icon: 'broom', hint: '哪些能安全删、能腾多少' },
   { key: 'trash', label: '回收站', icon: 'recycle', hint: '看看自己删了什么，能还原' }
 ]

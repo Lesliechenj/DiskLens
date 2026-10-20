@@ -1,6 +1,6 @@
 // 应用设置：默认值 + 合并逻辑（纯函数，主进程与渲染层共用）
 
-import type { AppSettings, ThemeMode } from './types'
+import type { AppSettings, CleanupElevation, ThemeMode } from './types'
 import { DEFAULT_EXCLUDE_NAMES } from './excludes'
 
 /** 设置默认值 */
@@ -12,11 +12,16 @@ export function defaultSettings(): AppSettings {
     rememberPath: true,
     lastPath: '',
     recentPaths: [],
-    windowBounds: null
+    windowBounds: null,
+    beginnerMode: true,
+    onboarded: false,
+    autoSnapshot: true,
+    cleanupElevation: 'auto'
   }
 }
 
 const THEMES: ThemeMode[] = ['dark', 'light', 'system']
+const ELEVATIONS: CleanupElevation[] = ['auto', 'always', 'never']
 
 /** 把任意输入合并成合法设置（坏数据/旧版本设置不崩，字段逐个兜底） */
 export function normalizeSettings(raw: unknown): AppSettings {
@@ -37,6 +42,9 @@ export function normalizeSettings(raw: unknown): AppSettings {
         .filter((p): p is string => typeof p === 'string' && p.trim() !== '')
         .slice(0, 8)
     : base.recentPaths
+  const cleanupElevation = ELEVATIONS.includes(input.cleanupElevation as CleanupElevation)
+    ? (input.cleanupElevation as CleanupElevation)
+    : base.cleanupElevation
 
   return {
     theme,
@@ -45,6 +53,10 @@ export function normalizeSettings(raw: unknown): AppSettings {
     rememberPath: typeof input.rememberPath === 'boolean' ? input.rememberPath : base.rememberPath,
     lastPath: typeof input.lastPath === 'string' ? input.lastPath : base.lastPath,
     recentPaths,
+    beginnerMode: typeof input.beginnerMode === 'boolean' ? input.beginnerMode : base.beginnerMode,
+    onboarded: typeof input.onboarded === 'boolean' ? input.onboarded : base.onboarded,
+    autoSnapshot: typeof input.autoSnapshot === 'boolean' ? input.autoSnapshot : base.autoSnapshot,
+    cleanupElevation,
     windowBounds:
       input.windowBounds &&
       typeof input.windowBounds === 'object' &&

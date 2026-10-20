@@ -1,10 +1,17 @@
 import type { ElectronAPI } from '@electron-toolkit/preload'
 import type {
   AppSettings,
+  ArchiveInspection,
+  CleanupExecuteRequest,
+  CleanupExecuteResult,
   DriveInfo,
+  DuplicateCandidateGroup,
+  DuplicateProgress,
+  DuplicateStartResult,
   ExportPayload,
   ScanProgress,
   ScanResult,
+  SnapshotMeta,
   TrashEntry,
   TrashListing,
   TrashOutcome,
@@ -26,6 +33,13 @@ export interface AppInfo {
   isDev: boolean
 }
 
+export interface JunkScanResponse {
+  ok: boolean
+  result?: ScanResult
+  roots?: string[]
+  message?: string
+}
+
 export interface RestoreOutcome {
   id: string
   ok: boolean
@@ -38,8 +52,11 @@ export interface DiskLensApi {
   checkPath: (targetPath: string) => Promise<PathCheckResult>
   listDrives: () => Promise<DriveInfo[]>
   onDrivesUpdated: (cb: (drives: DriveInfo[]) => void) => () => void
-  startScan: (rootPath: string, excludeNames?: string[]) => Promise<ScanStartResult>
+  startScan: (rootPaths: string | string[], excludeNames?: string[]) => Promise<ScanStartResult>
   cancelScan: () => void
+  scanJunk: () => Promise<JunkScanResponse>
+  cancelJunkScan: () => void
+  onJunkProgress: (cb: (progress: ScanProgress) => void) => () => void
   onScanProgress: (cb: (progress: ScanProgress) => void) => () => void
   onScanDone: (cb: (result: ScanResult) => void) => () => void
   onScanError: (cb: (message: string) => void) => () => void
@@ -48,11 +65,20 @@ export interface DiskLensApi {
   openFile: (path: string) => Promise<void>
   trashFiles: (paths: string[]) => Promise<TrashOutcome[]>
   onTrashProgress: (cb: (progress: TrashProgress) => void) => () => void
+  startDuplicateScan: (candidates: DuplicateCandidateGroup[]) => Promise<DuplicateStartResult>
+  cancelDuplicateScan: () => void
+  onDuplicateProgress: (cb: (progress: DuplicateProgress) => void) => () => void
+  executeCleanup: (request: CleanupExecuteRequest) => Promise<CleanupExecuteResult>
+  getLatestSnapshot: () => Promise<SnapshotMeta | null>
+  loadSnapshot: () => Promise<ScanResult | null>
+  deleteSnapshot: () => Promise<{ ok: boolean }>
+  onSnapshotSaved: (cb: (meta: SnapshotMeta) => void) => () => void
   listTrash: () => Promise<TrashListing>
   restoreTrash: (entries: TrashEntry[]) => Promise<RestoreOutcome[]>
   emptyTrash: () => Promise<{ ok: boolean; message?: string }>
   openTrashFolder: () => Promise<{ ok: boolean; message?: string }>
   previewFile: (path: string) => Promise<PreviewResult>
+  inspectArchive: (path: string) => Promise<ArchiveInspection>
   getSettings: () => Promise<AppSettings>
   updateSettings: (patch: Partial<AppSettings>) => Promise<AppSettings>
   exportReport: (payload: ExportPayload) => Promise<string | null>

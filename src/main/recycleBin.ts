@@ -9,8 +9,12 @@ import type { TrashEntry, TrashListing } from '../shared/types'
 
 /** 1601-01-01 到 1970-01-01 的毫秒差（FILETIME → Unix 毫秒） */
 const FILETIME_EPOCH_DIFF = 11644473600000n
-/** 一次最多列多少条（回收站塞了几十万条时别把界面撑爆） */
-const MAX_ENTRIES = 5000
+/**
+ * 一次最多列多少条。
+ * 不能太小：一次批量清理就可能产生上万条 $I，清完再"彻底释放"时
+ * 如果只读到前 5000 条，剩下的会一直躺在回收站里（v2.3 实测踩到）。
+ */
+const MAX_ENTRIES = 50_000
 
 /** FILETIME（100ns 单位）→ Unix 毫秒 */
 function filetimeToMs(filetime: bigint): number {

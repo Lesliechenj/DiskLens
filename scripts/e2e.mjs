@@ -3,7 +3,8 @@
 // 产物：.tmp-smoke/shots/*.png + 控制台断言汇总（失败退出码 1）
 
 import { _electron as electron } from 'playwright-core'
-import { mkdir, rm, writeFile, open } from 'node:fs/promises'
+import { mkdir, rm, writeFile, open, utimes } from 'node:fs/promises'
+import { execFileSync } from 'node:child_process'
 import { join } from 'node:path'
 
 const root = process.cwd()
@@ -65,7 +66,36 @@ async function buildFixture() {
   await make('项目/node_modules/lib/index.js', 8 * 1024 * 1024)
   await make('项目/样式/app.css', 0, 'body { margin: 0 }\n')
   await make('空文件夹/.keep', 0, '')
+  // 真·空目录（不能用 make：make 会创建一个 0 字节文件）
+  await mkdir(join(fixtureDir, '空文件夹/空的子目录/更空'), { recursive: true })
   await make('超大文件/备份镜像.iso', 96 * 1024 * 1024)
+
+  // 查重用的"真重复"：大小刻意选一个别处没有的值，内容都是零（稀疏文件，创建快）
+  await make('重复/资料副本-A.bin', 7_777_777)
+  await make('重复/子目录/资料副本-B.bin', 7_777_777)
+
+  // 一个真正的 ZIP，用来验证「压缩包内容」不是摆设
+  await make('压缩包源/说明.txt', 0, '这是 DiskLens 测试压缩包里的说明文件。\n')
+  execFileSync('powershell.exe', [
+    '-NoProfile',
+    '-Command',
+    `Compress-Archive -LiteralPath '${join(fixtureDir, '压缩包源', '说明.txt').replace(/'/g, "''")}' -DestinationPath '${join(fixtureDir, '下载', '真实压缩包.zip').replace(/'/g, "''")}' -Force`
+  ])
+  await rm(join(fixtureDir, '压缩包源'), { recursive: true, force: true })
+
+  // 文件年龄用的"老文件"：把修改时间拨到 2018 / 2020
+  await make('备份/旧视频-2018.mp4', 30 * 1024 * 1024)
+  await make('备份/旧文档-2020.docx', 1_234_567)
+  await utimes(
+    join(fixtureDir, '备份/旧视频-2018.mp4'),
+    new Date('2018-03-15'),
+    new Date('2018-03-15')
+  )
+  await utimes(
+    join(fixtureDir, '备份/旧文档-2020.docx'),
+    new Date('2020-06-01'),
+    new Date('2020-06-01')
+  )
 
   // 一堆小文件：验证"其他 N 项小内容"合并块与性能
   for (let i = 0; i < 240; i += 1) {
@@ -104,6 +134,8 @@ async function main() {
   const shot = async (name) => {
     shotIndex += 1
     const file = join(shotsDir, `${String(shotIndex).padStart(2, '0')}-${name}.png`)
+    // 等弹窗/图表的入场动画走完再截，别把半透明的中间帧留给截图
+    await page.waitForTimeout(260)
     await page.screenshot({ path: file })
     console.log(`  shot → ${file}`)
   }
@@ -144,6 +176,20 @@ async function main() {
   check('磁盘列表已读取', driveCount >= 1, `${driveCount} 个盘：${driveNames.join(' / ')}`)
   check('欢迎页磁盘卡片', (await page.locator('.drive-card').count()) >= 1)
   await shot('welcome')
+
+  // —— 新手向导第一步（不实际启动扫描，避免动真盘）——
+  await page.locator('.welcome-actions .btn:has-text("新手向导")').click()
+  await page.waitForSelector('.cleanup-wizard', { timeout: 5000 })
+  check('新手向导可打开', (await page.locator('.cleanup-wizard').count()) === 1)
+  check('向导有快速/完整两种模式', (await page.locator('.wizard-mode').count()) === 2)
+  await page.locator('.wizard-mode:has-text("完整扫描")').click()
+  await page.waitForTimeout(250)
+  check('完整扫描模式列出磁盘', (await page.locator('.wizard-drive').count()) >= 1)
+  await page.locator('.wizard-mode:has-text("快速清理")').click()
+  await shot('wizard')
+  await page.locator('.wizard-head .icon-btn').click()
+  await page.waitForTimeout(300)
+  check('新手向导可关闭', (await page.locator('.cleanup-wizard').count()) === 0)
 
   // 布局硬伤自检：溢出、塌陷、错位（桌面软件最容易翻车的地方）
   const layoutIssues = await page.evaluate(() => {
@@ -252,6 +298,90 @@ async function main() {
   }
   await shot('folders')
 
+  // —— 目录树（WinDirStat 的 Directory List）——
+  await page.click('.view-tabs .tab:has-text("目录树")')
+  await page.waitForTimeout(700)
+  const treeRows = await page.locator('.tree-grid.tr').count()
+  check('目录树渲染', treeRows >= 5, `${treeRows} 行`)
+  const caretCount = await page.locator('.tree-caret:not(.placeholder)').count()
+  check('目录树有可展开的目录', caretCount >= 2, `${caretCount} 个可展开目录`)
+  await page.locator('.tree-caret:not(.placeholder)').first().click()
+  await page.waitForTimeout(350)
+  const collapsedRows = await page.locator('.tree-grid.tr').count()
+  check('目录树可收起', collapsedRows < treeRows, `${collapsedRows} < ${treeRows}`)
+  await page.locator('.tree-caret:not(.placeholder)').first().click()
+  await page.waitForTimeout(350)
+  check('目录树可重新展开', (await page.locator('.tree-grid.tr').count()) >= treeRows - 1)
+  await shot('tree')
+
+  // —— 文件年龄：老文件统计 + 年龄分布 ——
+  await page.click('.view-tabs .tab:has-text("文件年龄")')
+  await page.waitForTimeout(700)
+  check('文件年龄有 7 个时间段', (await page.locator('.age-bar-row').count()) === 7)
+  const ageOldSize = await page.locator('.age-hero-size').innerText()
+  check('文件年龄统计到旧文件', ageOldSize !== '0 B', ageOldSize)
+  const ageRows = await page.locator('.table .tr').count()
+  check('旧文件清单有数据', ageRows > 0, `${ageRows} 行`)
+  await page.locator('.age-bar-row').last().click()
+  await page.waitForTimeout(400)
+  check('点年龄条可筛选', (await page.locator('.age-bar-row.active').count()) === 1)
+  await shot('age')
+
+  // —— 重复文件：真的跑一遍查重，验证"每组保留一份"的交互 ——
+  await page.click('.view-tabs .tab:has-text("重复文件")')
+  await page.waitForTimeout(600)
+  check('重复文件视图渲染', (await page.locator('.dupe-hero').count()) === 1)
+  await page.locator('.dupe-hero-actions .btn.primary').click()
+  const dupeReady = await page
+    .waitForSelector('.dupe-card, .empty-state', { timeout: 60_000 })
+    .then(() => true)
+    .catch(() => false)
+  check('查重能跑完并给出结果', dupeReady)
+  const dupeGroups = await page.locator('.dupe-card').count()
+  check('查重找到重复文件组', dupeGroups >= 1, `${dupeGroups} 组`)
+  if (dupeGroups > 0) {
+    check('每组至少两份副本', (await page.locator('.dupe-file').count()) >= 2)
+    check('默认保留一份', (await page.locator('.dupe-keep-badge').count()) >= 1)
+    const keepButtons = page.locator('.dupe-file .btn.ghost.xs')
+    if ((await keepButtons.count()) > 0) {
+      await keepButtons.first().click()
+      await page.waitForTimeout(300)
+      check('可以换"保留这份"', (await page.locator('.dupe-keep-badge').count()) >= 1)
+    }
+    await shot('duplicates-list')
+    // 点"移走 N 份"必须弹二次确认（不实际删除）
+    await page.locator('.dupe-card .btn.danger.sm').first().click()
+    await page.waitForTimeout(400)
+    check('查重删除前有二次确认', (await page.locator('.modal-overlay .modal').count()) === 1)
+    await shot('duplicates-confirm')
+    await page.locator('.modal-actions .btn:not(.danger)').click()
+    await page.waitForTimeout(250)
+    check('查重取消确认后关闭', (await page.locator('.modal-overlay').count()) === 0)
+  } else {
+    await shot('duplicates')
+  }
+
+  // —— 压缩包：按大小列出，ZIP 可看内容 ——
+  await page.click('.view-tabs .tab:has-text("压缩包")')
+  await page.waitForTimeout(700)
+  check('压缩包视图渲染', (await page.locator('.archive-hero').count()) === 1)
+  const archiveRows = await page.locator('.archives-grid.tr').count()
+  check('压缩包列表有数据', archiveRows > 0, `${archiveRows} 行`)
+  const zipInspect = page.locator('.archives-grid.tr:has-text("真实压缩包") .btn.ghost.xs').first()
+  if ((await zipInspect.count()) > 0) {
+    await zipInspect.click()
+    await page.waitForSelector('.archive-modal', { timeout: 8000 })
+    await page.waitForTimeout(500)
+    const archiveEntries = await page.locator('.archive-entry').count()
+    check('ZIP 内容可查看', archiveEntries >= 1, `${archiveEntries} 项`)
+    await shot('archives')
+    await page.locator('.archive-modal .modal-foot .btn.primary').click()
+    await page.waitForTimeout(250)
+  } else {
+    check('ZIP 内容可查看', false, '没找到真实压缩包行')
+    await shot('archives')
+  }
+
   // —— 文件分类：选一类看全 = 只挑所有 .docx ——
   await page.click('.view-tabs .tab:has-text("文件分类")')
   await page.waitForTimeout(600)
@@ -284,6 +414,8 @@ async function main() {
   await page.waitForTimeout(600)
   const cleanupCards = await page.locator('.cleanup-card').count()
   check('清理建议有分组', cleanupCards >= 2, `${cleanupCards} 组`)
+  const cleanupTitles = await page.locator('.cleanup-title h3').allInnerTexts()
+  check('清理建议包含空文件夹', cleanupTitles.includes('空文件夹'), cleanupTitles.join(' / '))
   const cleanupSize = await page.locator('.cleanup-hero-size').innerText()
   check('清理建议给出可腾空间', cleanupSize.length > 0, cleanupSize)
   await shot('cleanup')
@@ -302,6 +434,10 @@ async function main() {
     check('取消确认后弹窗关闭', (await page.locator('.modal-overlay').count()) === 0)
 
     // —— 真删一批：验证批量进度条（删的是夹具里的临时文件，删掉也无所谓）——
+    const filesBefore = Number(
+      (/扫描到 ([\d,]+) 个文件/.exec(await page.locator('.statusbar-left').innerText()) ??
+        [])[1]?.replace(/,/g, '') ?? -1
+    )
     await page.locator('.cleanup-card').first().locator('.btn.danger.sm').click()
     await page.waitForTimeout(300)
     await page.locator('.modal-actions .btn.danger').click()
@@ -319,29 +455,54 @@ async function main() {
       .waitForSelector('.trash-progress', { state: 'detached', timeout: 8000 })
       .catch(() => undefined)
     check('删除完成后进度条自动收起', (await page.locator('.trash-progress').count()) === 0)
+    await page.waitForTimeout(400)
+    const filesAfter = Number(
+      (/扫描到 ([\d,]+) 个文件/.exec(await page.locator('.statusbar-left').innerText()) ??
+        [])[1]?.replace(/,/g, '') ?? -1
+    )
+    check(
+      '删除后状态栏文件数同步减少',
+      filesBefore > 0 && filesAfter > 0 && filesAfter < filesBefore,
+      `${filesBefore} → ${filesAfter}`
+    )
+
+    // 每次清理后都必须弹报告：展示释放空间、前后磁盘、报告路径
+    await page.waitForSelector('.cleanup-report-modal', { timeout: 15_000 }).catch(() => undefined)
+    check('清理后自动弹出报告', (await page.locator('.cleanup-report-modal').count()) === 1)
+    const reportFreed = await page.locator('.report-big-number strong').innerText()
+    check('报告显示释放空间', reportFreed.length > 0, reportFreed)
+    check('报告有前后磁盘空间', (await page.locator('.report-drive').count()) >= 1)
+    const reportPath = await page.locator('.report-path code').innerText()
+    check('报告带详细文件路径', /\.html?$/i.test(reportPath.trim()), reportPath)
+    check(
+      '报告有查看路径/打开报告按钮',
+      (await page.locator('.report-foot button:has-text("查看报告存放路径")').count()) === 1 &&
+        (await page.locator('.report-foot button:has-text("打开详细报告")').count()) === 1
+    )
+    await shot('cleanup-report')
+    await page.locator('.report-foot button:has-text("完成")').click()
+    await page
+      .waitForSelector('.cleanup-report-modal', { state: 'detached', timeout: 5000 })
+      .catch(() => undefined)
+    check('报告可关闭', (await page.locator('.cleanup-report-modal').count()) === 0)
   }
 
   // —— 回收站视图 ——
   await page.click('.view-tabs .tab:has-text("回收站")')
   await page.waitForTimeout(500)
   check('回收站视图渲染', (await page.locator('.trash-hero').count()) === 1)
-  // 回收站可能有几千条记录，读取要几秒：等列表或空状态出现，别只等固定时间
-  await page.waitForTimeout(400)
-  const trashSettled = await page
-    .waitForFunction(
-      () =>
-        document.querySelectorAll('.trash-grid.tr').length > 0 ||
-        document.querySelector('.empty-state') !== null,
-      { timeout: 30_000 }
-    )
-    .then(() => true)
-    .catch(() => false)
+  // 回收站可能有几千条记录，读取要几秒：先等加载占位消失，再判断列表/空状态
+  await page
+    .waitForSelector('.trash-loading', { state: 'detached', timeout: 60_000 })
+    .catch(() => undefined)
+  await page.waitForTimeout(300)
   const trashRows = await page.locator('.trash-grid.tr').count()
   const trashEmpty = await page.locator('.empty-state').count()
+  const trashLoading = await page.locator('.trash-loading').count()
   check(
     '回收站能列出（或说明为空）',
-    trashSettled && (trashRows > 0 || trashEmpty > 0),
-    `${trashRows} 条${trashEmpty ? '（空状态）' : ''}`
+    trashLoading === 0 && (trashRows > 0 || trashEmpty > 0),
+    `${trashRows} 条${trashEmpty ? '（空状态）' : ''}${trashLoading ? '（仍在加载）' : ''}`
   )
   const trashTotal = await page.locator('.trash-hero-size').innerText()
   check('回收站给出占用合计', trashTotal.length > 0, trashTotal)
@@ -392,6 +553,21 @@ async function main() {
   check('关于弹窗打开', (await page.locator('.about-facts').count()) === 1)
   await shot('about')
   await page.locator('.modal-head .icon-btn').click()
+  await page.waitForTimeout(250)
+
+  // —— 新手帮助：按钮 + F1 + Esc ——
+  await page.click('.titlebar .icon-btn[title="新手帮助（F1）"]')
+  await page.waitForSelector('.help-modal', { timeout: 5000 })
+  check('新手帮助打开', (await page.locator('.help-section').count()) >= 5)
+  check('帮助里有视图说明', (await page.locator('.help-table-row').count()) >= 8)
+  await shot('help')
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(250)
+  check('Esc 可关闭帮助', (await page.locator('.help-modal').count()) === 0)
+  await page.keyboard.press('F1')
+  await page.waitForTimeout(350)
+  check('F1 可打开帮助', (await page.locator('.help-modal').count()) === 1)
+  await page.keyboard.press('Escape')
   await page.waitForTimeout(250)
 
   // —— 浅色主题 ——
@@ -491,6 +667,16 @@ async function main() {
   check('主题设置在重启后保留', restoredTheme === 'light', `重启后主题=${restoredTheme}`)
   const restoredInput = await page2.locator('.path-field input').inputValue()
   check('上次路径在重启后回填', restoredInput.length > 0, restoredInput || '（空）')
+  const snapshotRestorable = await page2.locator('.welcome-snapshot').count()
+  check('重启后提供上次扫描快照', snapshotRestorable === 1)
+  if (snapshotRestorable === 1) {
+    await page2.locator('.welcome-snapshot').click()
+    const restoredView = await page2
+      .waitForSelector('.view-chart', { timeout: 20_000 })
+      .then(() => true)
+      .catch(() => false)
+    check('快照恢复后直接进入面积图', restoredView)
+  }
   // 还原成深色，别把用户设置留在浅色
   await page2.click('.titlebar .icon-btn[title="切换到深色主题"]')
   await page2.waitForTimeout(500)

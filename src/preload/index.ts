@@ -2,10 +2,17 @@ import { contextBridge, ipcRenderer, webUtils } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
 import type {
   AppSettings,
+  ArchiveInspection,
+  CleanupExecuteRequest,
+  CleanupExecuteResult,
   DriveInfo,
+  DuplicateCandidateGroup,
+  DuplicateProgress,
+  DuplicateStartResult,
   ExportPayload,
   ScanProgress,
   ScanResult,
+  SnapshotMeta,
   TrashEntry,
   TrashListing,
   TrashOutcome,
@@ -35,6 +42,14 @@ export interface AppInfo {
   isDev: boolean
 }
 
+/** 系统垃圾扫描结果 */
+export interface JunkScanResponse {
+  ok: boolean
+  result?: ScanResult
+  roots?: string[]
+  message?: string
+}
+
 /** 订阅 IPC 并返回取消订阅函数（React effect 里直接 return 清理） */
 function subscribe<T>(channel: string, callback: (payload: T) => void): () => void {
   const listener = (_event: Electron.IpcRendererEvent, payload: T): void => callback(payload)
@@ -61,11 +76,18 @@ const api = {
   /** 卷标补齐后主进程会再推一次完整列表 */
   onDrivesUpdated: (cb: (drives: DriveInfo[]) => void): (() => void) =>
     subscribe('drives:updated', cb),
-  /** 发起扫描（主进程转发给隐藏扫描进程） */
-  startScan: (rootPath: string, excludeNames: string[] = []): Promise<ScanStartResult> =>
-    ipcRenderer.invoke('scan:start', rootPath, excludeNames),
+  /** 发起扫描（支持单个路径或一次多个路径/多个盘） */
+  startScan: (
+    rootPaths: string | string[],
+    excludeNames: string[] = []
+  ): Promise<ScanStartResult> => ipcRenderer.invoke('scan:start', rootPaths, excludeNames),
   /** 取消正在进行的扫描 */
   cancelScan: (): void => ipcRenderer.send('scan:cancel'),
+  /** 扫描已知临时/缓存目录（新手向导用，比整盘快） */
+  scanJunk: (): Promise<JunkScanResponse> => ipcRenderer.invoke('junk:scan'),
+  cancelJunkScan: (): void => ipcRenderer.send('junk:cancel'),
+  onJunkProgress: (cb: (progress: ScanProgress) => void): (() => void) =>
+    subscribe('junk:progress', cb),
   onScanProgress: (cb: (progress: ScanProgress) => void): (() => void) =>
     subscribe('scan:progress', cb),
   onScanDone: (cb: (result: ScanResult) => void): (() => void) => subscribe('scan:done', cb),
@@ -79,6 +101,9 @@ const api = {
   trashFiles: (paths: string[]): Promise<TrashOutcome[]> => ipcRenderer.invoke('file:trash', paths),
   /** 文件预览：图片 dataURL / 文本头部 */
   previewFile: (path: string): Promise<PreviewResult> => ipcRenderer.invoke('file:preview', path),
+  /** 查看 ZIP 内容（RAR/7Z 请用系统工具打开） */
+  inspectArchive: (path: string): Promise<ArchiveInspection> =>
+    ipcRenderer.invoke('archive:inspect', path),
   /** 读设置 */
   getSettings: (): Promise<AppSettings> => ipcRenderer.invoke('settings:get'),
   /** 写设置（部分字段），返回合并后的完整设置 */
@@ -93,6 +118,26 @@ const api = {
   /** 批量移到回收站的逐条进度 */
   onTrashProgress: (cb: (progress: TrashProgress) => void): (() => void) =>
     subscribe('trash:progress', cb),
+  /** 查重：候选清单由渲染层按大小分组后传入，主进程读内容比对 */
+  startDuplicateScan: (candidates: DuplicateCandidateGroup[]): Promise<DuplicateStartResult> =>
+    ipcRenderer.invoke('dupes:start', candidates),
+  /** 取消正在进行的查重 */
+  cancelDuplicateScan: (): void => ipcRenderer.send('dupes:cancel'),
+  /** 查重进度 */
+  onDuplicateProgress: (cb: (progress: DuplicateProgress) => void): (() => void) =>
+    subscribe('dupes:progress', cb),
+  /** 清理：普通权限或一次管理员授权，整批执行并自动生成报告 */
+  executeCleanup: (request: CleanupExecuteRequest): Promise<CleanupExecuteResult> =>
+    ipcRenderer.invoke('cleanup:execute', request),
+  /** 最近一次扫描快照的元信息 */
+  getLatestSnapshot: (): Promise<SnapshotMeta | null> => ipcRenderer.invoke('snapshot:latest'),
+  /** 恢复最近一次扫描快照 */
+  loadSnapshot: (): Promise<ScanResult | null> => ipcRenderer.invoke('snapshot:load'),
+  /** 删除快照 */
+  deleteSnapshot: (): Promise<{ ok: boolean }> => ipcRenderer.invoke('snapshot:delete'),
+  /** 快照保存完成（扫描后自动保存） */
+  onSnapshotSaved: (cb: (meta: SnapshotMeta) => void): (() => void) =>
+    subscribe('snapshot:saved', cb),
   /** 列出系统回收站内容（自己删了哪些东西） */
   listTrash: (): Promise<TrashListing> => ipcRenderer.invoke('trash:list'),
   /** 还原回收站里的条目（原位置有同名文件就不覆盖） */

@@ -58,7 +58,7 @@ export function AboutDialog(): React.JSX.Element | null {
           <ul className="about-facts">
             <li>
               <span>版本</span>
-              <b>v{info?.version ?? '2.0.0'}</b>
+              <b>v{info?.version ?? '—'}</b>
             </li>
             <li>
               <span>运行环境</span>
