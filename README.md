@@ -5,9 +5,9 @@
 C 盘又飘红了？资源管理器翻半天找不到到底谁占了地方？DiskLens 扫一遍，用一张图告诉你答案——
 还会顺手把「哪些能安全删、能腾出多少」列成清单，照着点就行。
 
-[![CI](https://github.com/your-username/DiskLens/actions/workflows/build.yml/badge.svg)](../../actions)
+[![CI](https://github.com/Lesliechenj/DiskLens/actions/workflows/build.yml/badge.svg)](https://github.com/Lesliechenj/DiskLens/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Release](https://img.shields.io/github/v/release/your-username/DiskLens)](../../releases)
+[![Release](https://img.shields.io/github/v/release/Lesliechenj/DiskLens)](https://github.com/Lesliechenj/DiskLens/releases)
 
 ![面积图：块越大占地方越多](docs/screenshots/treemap-dark.png)
 
@@ -157,14 +157,14 @@ FILE 记录/数据运行/属性列表。解析错一条就可能给出错误的�
 
 ### 下载使用
 
-前往 [Releases](../../releases) 页面下载最新版安装包（Windows / macOS / Linux），双击安装即可。
+前往 [Releases](https://github.com/Lesliechenj/DiskLens/releases) 页面下载最新版安装包（Windows / macOS / Linux），双击安装即可。
 
 ### 开发运行
 
 需要环境：Node.js 20+ 和 npm。
 
 ```bash
-git clone https://github.com/<你的用户名>/DiskLens.git
+git clone https://github.com/Lesliechenj/DiskLens.git
 cd DiskLens
 
 npm install        # 装依赖

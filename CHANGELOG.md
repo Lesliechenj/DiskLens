@@ -197,9 +197,9 @@ v1.0 发布后的第一批体验改进（用户实测反馈：扫得久、不知
 - 统一数据契约：一棵 JSON 树，多图表同源渲染
 - CI：push/PR 自动 typecheck + build；打 tag 自动构建三平台安装包并发布 Release
 
-[1.0.0]: https://github.com/your-username/DiskLens/releases/tag/v1.0.0
-[1.1.0]: https://github.com/your-username/DiskLens/releases/tag/v1.1.0
-[2.0.0]: https://github.com/your-username/DiskLens/releases/tag/v2.0.0
-[2.1.0]: https://github.com/your-username/DiskLens/releases/tag/v2.1.0
-[2.2.0]: https://github.com/your-username/DiskLens/releases/tag/v2.2.0
-[2.3.0]: https://github.com/your-username/DiskLens/releases/tag/v2.3.0
+[1.0.0]: https://github.com/Lesliechenj/DiskLens/releases/tag/v1.0.0
+[1.1.0]: https://github.com/Lesliechenj/DiskLens/releases/tag/v1.1.0
+[2.0.0]: https://github.com/Lesliechenj/DiskLens/releases/tag/v2.0.0
+[2.1.0]: https://github.com/Lesliechenj/DiskLens/releases/tag/v2.1.0
+[2.2.0]: https://github.com/Lesliechenj/DiskLens/releases/tag/v2.2.0
+[2.3.0]: https://github.com/Lesliechenj/DiskLens/releases/tag/v2.3.0
